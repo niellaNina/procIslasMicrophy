@@ -1,0 +1,19 @@
+name: microphy
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - numpy
+  - pandas
+  - matplotlib
+  - xarray
+  - seaborn
+  - spyder
+  - jupyter
+  - cartopy
+  - netcdf4
+  - pydap
+  - h5netcdf
+  - iris
+  - pint
+
