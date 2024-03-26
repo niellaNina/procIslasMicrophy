@@ -11,116 +11,161 @@ Creates:
 
 @author: ninalar
 """
-
-# ---Packages---
-import xarray as xr # read netcdf-files
-
-# standard data analysis packages:
-import numpy as np
-import pandas as pd
-import datetime as dt
-from dateutil import parser
-
-#filemanagement packages
-import glob # allows for wildcards in filemanagement
-import os #get a list of all directories/files
-
-# functions used fron function.py file
-from functions import sec_since_midnigth
-
-# ----- Data ------
-# Read in the CDP files and the NAV files(for temperature and coordinates)
-# NAV files ar nc files in the format: ISLAS_SAFIRE-ATR42_CORE_TDYN_1HZ_YYYYMMDD_*flightid*_L1_V1.nc
-# 
-# CDP files are csvfiles in the format: 00CDP YYYYMMDDXXXXX.csv
-
-# Local disk path of data:
-main_path = '../2022-islas/' # directory with flight data
-pads_path = '/microphy/pads/' # path to pads (CIP and CDP data)
-nav_file_struct = '/ISLAS_SAFIRE-ATR42_CORE_TDYN_1HZ_*_L1_V1.nc' # structure of nav file names
-cdp_file_struct = '/02CDP*.csv' # structure of cdp file names
-drop_flights = ['as220005','as220006'] # flights to drop, (if not all are to be analysed 5 and 6 is in france)
-
-flights = [
-    f for f in os.listdir(main_path) if os.path.isdir(os.path.join(main_path, f))
-]
-
-# remove flights to drop using listcomprehension
-flights = [i for i in flights if i not in drop_flights]
-
-islas_cdp_df = [] #empty list for appending all data to one structure
-check_df = [] #empty checklist
-
-for flight in flights:
-    # ---- Get NAV data from flight
+def read_cdp(nav_df):
+    #Reads the CDP files and does corrections based on TAS (needs this from nav_df)
+    # ---Packages---
+    import xarray as xr # read netcdf-files
     
-    nav_file = glob.glob(main_path + flight + nav_file_struct) # returns a list, must access with file[0]
-    nav_xds = xr.open_dataset(nav_file[0]) # returns an xarray dataset
+    # standard data analysis packages: (all packages used in modules must be imported in the module)
+    import pandas as pd
+    #import datetime as dt
+    #from dateutil import parser (not used yet)
     
-    # --- Prepare NAV information for adding to the cdp_df
-    # Necessary NAV data: TAS1 (m/s)(variable) and HEIGHT(meter)(coordinate)
-    # Use TAS1: the TAS from the Scientific Static/Pitot system, given in m/s, instead of
-    # TAS2: the TAS from the Avionic Static/Pitot system (ADC), given in kt, to have correct units
-
-    # create pandas series of the variables:
-    alt_ds = nav_xds.coords['ALTITUDE'].to_pandas()
-    tas1_ds = nav_xds.TAS1.to_pandas() # the TAS from the Scientific Static/Pitot system, given in m/s
-
-    # get unit information from 
-    alt_unit = nav_xds.coords['ALTITUDE'].attrs['units']
-    tas_unit = nav_xds.TAS1.attrs['units']
-
-    nav_df = pd.DataFrame({f'Altitude ({alt_unit})':alt_ds, f'TAS ({tas_unit})':tas1_ds}) #unit information is in the attributes of the xds
-
-    # add a new colum to the dataframe that is the time in UTC seconds/seconds from midnigth
-    # FUNCTION: sec_since_midnigth: input: datetime-object, output: seconds since midnight as float
-    nav_df['UTC Seconds'] = nav_df.index.to_series().map(sec_since_midnigth) 
-
-    # ---- Get CDP data
-    #TODO: consider collecting the instrument metadata as well (line 1-54)
-    # at least these could be interresting: sample time, sample aresa, PAS information (3 lines)
+    #filemanagement packages
+    import glob # allows for wildcards in filemanagement
+    import os #get a list of all directories/files
     
-    # path to CDP data
-    path_in = main_path + flight + pads_path
+    # functions used fron function.py file
+    from functions import sec_since_midnigth, read_chunky_csv
     
-    # Get a list of all the CDPfiles in the directory (also look in subdirectories)
-    filelist = glob.glob(path_in + '**' + cdp_file_struct, recursive=True)
-
-    #in each directory there is a CDP-csv file
-    for file in filelist:
-        print('Reading: ' + file) 
+    # ----- Data ------
+    # Read in the CDP files and the NAV files(for temperature and coordinates)
+    # NAV files ar nc files in the format: ISLAS_SAFIRE-ATR42_CORE_TDYN_1HZ_YYYYMMDD_*flightid*_L1_V1.nc
+    # 
+    # CDP files are csvfiles in the format: 00CDP YYYYMMDDXXXXX.csv
+    
+    # Local disk path of data:
+    main_path = '../2022-islas/' # directory with flight data
+    pads_path = '/microphy/pads/' # path to pads (CIP and CDP data)
+    cdp_file_struct = '/02CDP*.csv' # structure of cdp file names
+    drop_flights = ['as220005','as220006'] # flights to drop, (if not all are to be analysed 5 and 6 is in france)
+    
+    flights = [
+        f for f in os.listdir(main_path) if os.path.isdir(os.path.join(main_path, f))
+    ]
+    
+    # remove flights to drop using listcomprehension
+    flights = [i for i in flights if i not in drop_flights]
+    
+    islas_cdp_df = []  # empty list for appending all data to one structure
+    #check_df = [] #empty checklist keep for metadata later
+    
+    print('----Reading CDP files:')
+    
+    for flight in flights:
+          
+        # ---- Get CDP data
+        #TODO: consider collecting the instrument metadata as well (line 1-54)
+        # at least these could be interresting: sample time, sample aresa, PAS information (3 lines)
         
-        # reading in csv data without metadata    
-        cdp_df = pd.read_csv(file, skiprows = 58, encoding = "ISO-8859-1")
+        # path to CDP data
+        path_in = main_path + flight + pads_path
+        
+        # Get a list of all the CDPfiles in the directory (also look in subdirectories)
+        filelist = glob.glob(path_in + '**' + cdp_file_struct, recursive=True)
     
-        # Bins are defined in the metadata on rows 23 and 24, separate on both , and > to get correct values, 
-        # engine = python to use regext in sep    
-        # Create a dataframe of the bin size and threshold information by extracting the informations into lists
-        # and building the dataframe from these
-        size = list(pd.read_csv(file, 
-                             index_col=[0],
-                             skiprows = lambda x: x not in [22], 
-                             encoding = "ISO-8859-1", 
-                             sep=r'[,>]', 
-                             engine = 'python'))
-        thr = list(pd.read_csv(file, 
-                             index_col=[0],
-                             skiprows = lambda x: x not in [23], 
-                             encoding = "ISO-8859-1", 
-                             sep=r'[,>]', 
-                             engine = 'python'))
-        #define bin numbers
-        cdp_bin = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30]  
-        # Create dataframe from dictionary of lists and change dtype to int
-        bins_df = pd.DataFrame({'CDP Bin': cdp_bin, 'Size': size, 'Threshold': thr}).astype('int64')
+        #in each directory there is a CDP-csv file
+        for file in filelist:
+            print('Reading: ' + file) 
+            
+            # reading in csv data without metadata    
+            cdp_list = read_chunky_csv(file)
+            
+            # --- Get data information from 2th chunk. Turn this into a dataframe:
+            data = cdp_list[2]
+            data.pop(0) # remove separator line
+            header = data.pop(0) #get header
+            cdp_df = pd.DataFrame(data) # turn into dataframe
+            cdp_df = cdp_df.astype(float) # change from string to float
+            cdp_df.columns = header #add header information to df
+            cdp_df["flightid"]=flight # add flight information
+            
+            #---- Get metadata from 0th item in cdp_list
+            meta = cdp_list[0]
+            # flatten the list
+            cdp_meta = [item[0] if len(item) == 1 else ' '.join(item) for item in meta]
+            cdp_meta.pop(0) # remove first item of list [Instrument2]
+            
+            # split list based on conditions (including "Channel" or "<30>" and the rest)
+            sub_ch = 'Channels'
+            sub_bin = '<30>'
+            
+            chan_list = [i for i in cdp_meta if sub_ch in i] # list of all items with 'Channel'
+            bin_list = [i for i in cdp_meta if sub_bin in i] # list of all items with '<30>'
+            
+            meta_bin_list = list(set(cdp_meta).difference(chan_list)) # remove chan_list from cdp_list
+            meta_list = list(set(meta_bin_list).difference(bin_list)) # remove bin_list from the resulting list
+            
+            # Turn metadata list into dataframe, clean up and separate variable from value 
+            meta_df=pd.DataFrame(meta_list, columns=['Metadata'])
+            meta_df['Value'] = meta_df['Metadata'].apply(lambda x: x.split('=')[1].strip())
+            meta_df['Metadata'] = meta_df['Metadata'].apply(lambda x: x.split('=')[0].strip())
+            
+            # Turn bin_list (list of strings) into dataframe of bin information
+            # Take entry that includes size or thres, remove the parts of the string that is not values, turn into list
+            size_list = [i for i in bin_list if 'Size' in i][0].replace("Sizes=<30>","",1).split(" ")
+            thr_list = [i for i in bin_list if 'Thres' in i][0].replace("Thresholds=<30>","",1).split(" ")
+            # Make list of lower edges
+            # lower edge of the first bin is in the metadata, the rest is the same as size list -last entry
+            bin1min = meta_df.loc[meta_df['Metadata']=='Bin 1 Lower Thresh.','Value'].iloc[0] # get the value of the lower bin size treshold
+            size_min_list = list(bin1min)+ size_list # add the bin1min to the top of the list
+            size_min_list.pop() # remove the last item of the list
+            # generate bin number based on lenght of size_list and thr_list
+            if len(size_list)==len(thr_list):
+                bin_list = list(range(1,len(size_list)+1, 1))
+            else:
+                print('Warning: size_list and thr_list not of equal lenght')
+            
+            # turn the three lists into dataframe of integers
+            bins_df = pd.DataFrame({'CDP_Bin': bin_list, 'Size (microns)': size_list,'Min size': size_min_list, 'Threshold': thr_list}).astype('int64').set_index('CDP_Bin')
+            # calculate the bind width for each bin (for later normalization of values)
+            bins_df['Width']=bins_df['Size (microns)'] - bins_df['Min size']
+           
+            
+            # --- get pads information from 1st item in cdp_list
+            pads_info_df = pd.DataFrame(cdp_list[1], columns=['Info'])
+            # clean up and separate variable from unit 
+            pads_info_df['Value'] = pads_info_df['Info'].apply(lambda x: x.split('=')[1].strip())
+            pads_info_df['Info'] = pads_info_df['Info'].apply(lambda x: x.split('=')[0].strip())
 
-        # adding NAV information to the cdp data by merging on nearest UTC Seconds. 
-        cdp_nav_df = pd.merge_asof(cdp_df, nav_df, on = 'UTC Seconds', direction = 'nearest')
-
-        # add flightid for managing multiple fligths
-        cdp_nav_df["Flight_Id"]=flight
+            # adding NAV information to the cdp data by merging on nearest UTC Seconds. 
+            flight_nav_df = nav_df[nav_df['flightid']==flight]
+            cdp_nav_df = pd.merge_asof(cdp_df, flight_nav_df[['UTC Seconds','TAS (m/s)']] , on = 'UTC Seconds', direction = 'nearest')
+        
+            islas_cdp_df.append(cdp_nav_df) # append list with the new dataframe
     
-        islas_cdp_df.append(cdp_nav_df) # append list with the new dataframe
+    # concatenate all the flight dataframes in the list to a new dataframe containing all flights
+    islas_cdp_df = pd.concat(islas_cdp_df)
+    
+    # Clean up unnnecessary columns: Spare
+    islas_cdp_df = islas_cdp_df.loc[:,~islas_cdp_df.columns.str.startswith('Spare')]
+    
+    # --- Data corrections
+    
+    # adjust time variables to have a complete datetime object 'time'
+    
 
-# concatenate all the flight dataframes in the list to a new dataframe containing all flights
-islas_cdp_df = pd.concat(islas_cdp_df)
+    # -- CDP: adjust bulk parameters for TAS
+    # calculate TAS correction factor for each timestep
+    # (aircraft TAS - 13%)/PAS from probe calculations from Frey(2011)
+    islas_cdp_df['TAS probe reduction (m/s)'] = 0.87*islas_cdp_df['TAS (m/s)'] # reduce TAS due to airflow (-13%)
+    islas_cdp_df['TAS correction factor'] = (islas_cdp_df['TAS probe reduction (m/s)'])/islas_cdp_df['Applied PAS (m/s)']
+    
+    # adjust the Numb conc and the LWC parameters with the correction factor
+    # (MVD and ED is not dependent on TAS)
+    islas_cdp_df['Number Conc corr (#/cm^3)'] = islas_cdp_df['Number Conc (#/cm^3)']/islas_cdp_df['TAS correction factor']
+    islas_cdp_df['LWC corr (g/m^3)'] = islas_cdp_df['LWC (g/m^3)']/islas_cdp_df['TAS correction factor']
+    
+    #calculate the sample volume (sample area SA * TAS redused * sample time (1 sek))
+    # sample area from meta information and given in mm^2 readjust to m by dividing with 10⁶
+    sa = float(meta_df.loc[meta_df['Metadata'] == 'Sample Area (mm^2)', 'Value']) /(1000*1000)
+    st = 1 #NB should taken from the metadata to avoid constants
+    islas_cdp_df['SV (m^3)'] = sa * islas_cdp_df['TAS probe reduction (m/s)'] * st
+    
+    # Get variable information from header of dataframe
+    var_df = pd.DataFrame(islas_cdp_df.columns[islas_cdp_df.columns.str.endswith(')')], columns=['Variable'])
+    var_df['unit'] = var_df['Variable'].apply(lambda x: x.split('(')[1].strip())
+    var_df['Variable'] = var_df['Variable'].apply(lambda x: x.split('(')[0].strip())
+    var_df = var_df.replace(r'\)','',regex=True) # removing remaining ] in units
+    
+    return(islas_cdp_df, bins_df, var_df, meta_df)

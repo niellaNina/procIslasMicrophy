@@ -76,7 +76,7 @@ def read_chunky_csv(textfile, sep=[]):
     import csv
     
     # read in file as a list of lines
-    with open(textfile) as infile:
+    with open(textfile, encoding='ISO-8859-1') as infile:
         data_list = list(csv.reader(infile))  
 
     # The datafiles are composed of 5 different "chunks" of information separated by an empty line: 
@@ -98,3 +98,32 @@ def read_chunky_csv(textfile, sep=[]):
         sublists.append(current_sublist)
     
     return sublists
+
+def norm_by_bin(bin_start, bin_end, count_value, type_norm=None):
+    # normalize the count N in bin j by the width of the bin j
+    import numpy as np
+    
+    if type_norm == 'log':
+        norm_value_name = 'dN/dlogDp'
+        # calculate dlogDp
+        bin_norm = np.log(bin_end)-np.log(bin_start)  
+    elif type_norm == None:
+        norm_value_name = 'dN/dDp'
+        bin_norm = bin_end - bin_start
+    else:
+        print('Warning: type of normalization not defined')
+    
+    norm_count_value = count_value/bin_norm  
+    
+    return(norm_count_value, norm_value_name)
+
+def unnormalize(count_value, binwidth):
+    # Function to unnormalize a size spectra
+    # INPUT:
+        # - count_value: a size spectra/concentration in m^-4
+        # - endbins: bin endpoints in micro-m 
+    # OUTPUT:
+        # - unnorm_count_value: the unnormalized size spectra/concentration (in m⁻3)
+    unnorm_count_value = count_value*binwidth/1.0e6 # divide by 10e^6 to get m istead of micro-m 
+    
+    return(unnorm_count_value)
