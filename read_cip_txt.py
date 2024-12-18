@@ -4,6 +4,17 @@
 Created on Tue Feb 20 13:37:41 2024
 
 @author: ninalar
+
+Reading the resulting .txt file from analysing the raw image fields from the CIP with the Soda2 program
+File cosists of calculated bulk parameters for the given flight:
+Variables:
+   "Time" = Time at start of interval [UTC seconds]
+   "Nt" = Total Concentration for Particles with D>112.50um [#/m3]
+   "IWC" = Estimated Ice Water Content [g/m3]
+   "MMD" = Median Mass-weighted Diameter [microns]
+   "Conc001-Conc064" = Concentration per size bin, normalized by bin width [#/m4]
+
+Returns: 
 """
 def read_cip_txt():
     # ---Packages---
@@ -11,6 +22,7 @@ def read_cip_txt():
     # standard data analysis packages:
     import pandas as pd
     from datetime import datetime # to manage dates
+    import re #for regex matching
     
     #filemanagement packages
     import glob # allows for wildcards in filemanagement
@@ -35,6 +47,9 @@ def read_cip_txt():
     flights = [
         f for f in os.listdir(path_res) if os.path.isdir(os.path.join(path_res, f))
     ]
+
+    # filter list to only items following the structure 'as2200XX'
+    flights = [s for s in flights if re.match(r'as2200\d{2}$', s)]
     
     islas_proc_dict = {}  #empty dictionary for collecting processing information
     
@@ -149,16 +164,16 @@ def read_cip_txt():
             data_df = data_df.map(lambda x: x.strip() if isinstance(x, str) else x) # remove extra whitespaces
             data_df = data_df.astype(float) # change froms tring to float
             data_df.columns = header #add header information to df
-            data_df["flightid"]=flight
+            data_df["safireid"]=flight
             data_df.rename(columns={"Time": "UTC Seconds"},inplace = True) #rename 'Time' column to UTC Seconds to match other dataframes 
             # create new column with full datetime object
-            date = islas_proc_dict[flight]['Flight date (mm/dd/yy)']
+            date = pd.to_datetime(islas_proc_dict[flight]['Flight date (mm/dd/yy)'])
             #date = datetime.strptime(date, '%m/%d/%Y') # get flight date from processing dictionary
             
             # transform time to datetime, adding date from attributes
-            #sec_temp = pd.to_timedelta(data_df['UTC Seconds'], unit='s') #turn utc seconds since midnight into datetime object
-            #data_df['time'] = date + sec_temp # add date to the seconds since midnight
-          
+            sec_temp = data_df['UTC Seconds'].apply(lambda x: pd.to_timedelta(x, unit='s')) #turn utc seconds since midnight into datetime object
+            data_df['time'] = date + sec_temp # add date to the seconds since midnight
+            
             # concatenate information from this flight to total df
             if flights.index(flight) == 0:
                 # for first run of loop set up main dataframe

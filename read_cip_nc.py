@@ -4,6 +4,13 @@
 Created on Mon Mar 11 15:10:38 2024
 
 @author: ninalar
+
+Reading the resulting .nc file from analysing the raw image fields from the CIP with the Soda2 program
+File cosists of calculated bulk parameters for the given flight:
+Variables:
+
+
+Returns: 
 """
 
 # read CIP nc files
@@ -17,6 +24,7 @@ def read_cip_nc():
     import pandas as pd
     import glob # allows for wildcards in filemanagement
     import os #get a list of all directories/files
+    import re #regex
     
     
     warnings.filterwarnings('ignore', category=DeprecationWarning) # stop the deprecation warnigns from np time management
@@ -26,9 +34,12 @@ def read_cip_nc():
     cip_file_struct = '/*CIP.nc' # structure of cip text-file names
     drop_flights = ['as220005','as220006'] # flights to drop, (if not all are to be analysed 5 and 6 is in france)
     
+    # regex for only using folders that ar flights
+    patt = re.compile(r"as2200\d{2}") # flights have the pattern as2200 + 2 digits
      
     flights = [
-     f for f in os.listdir(main_path) if os.path.isdir(os.path.join(main_path, f))
+     f for f in os.listdir(main_path) 
+     if os.path.isdir(os.path.join(main_path, f)) and patt.fullmatch(f)
     ]
      
     # remove flights to drop using listcomprehension
@@ -48,37 +59,42 @@ def read_cip_nc():
         utc_ds = cip_xds.utc_time.to_pandas()
         tas_ds = cip_xds.TAS.to_pandas()
         conc_ds = cip_xds.CONCENTRATION.to_pandas()
-        lwc_ds = cip_xds.LWC.to_pandas()
-        iwc_ds = cip_xds.IWC.to_pandas()
-        nt_ds = cip_xds.NT.to_pandas() # 
-        mvd_ds = cip_xds.MVD.to_pandas() # 
-        mnd_ds = cip_xds.MND.to_pandas() # 
-        area_ds = cip_xds.AREA.to_pandas() # 
+        lwc_ds = cip_xds.LWC100.to_pandas()
+        iwc_ds = cip_xds.IWC100.to_pandas()
+        nt_ds = cip_xds.NT100.to_pandas() # 
+        mvd_ds = cip_xds.MVD100.to_pandas() # 
+        mnd_ds = cip_xds.MND100.to_pandas() # 
+        area_ds = cip_xds.AREA100.to_pandas() # 
         date = pd.to_datetime(cip_xds.attrs['FlightDate'], format='%m/%d/%Y') #date of flight from attributes
         
         # get unit information from 
-        lwc_unit = cip_xds.LWC.attrs['units']
-        iwc_unit = cip_xds.IWC.attrs['units']
+        lwc_unit = cip_xds.LWC100.attrs['units']
+        iwc_unit = cip_xds.IWC100.attrs['units']
         utc_unit = cip_xds.utc_time.attrs['units']
         tas_unit = cip_xds.TAS.attrs['units']
         conc_unit = cip_xds.CONCENTRATION.attrs['units'] 
-        nt_unit = cip_xds.NT.attrs['units']
-        mvd_unit = cip_xds.MVD.attrs['units']
-        mnd_unit = cip_xds.MND.attrs['units']
-        area_unit = cip_xds.AREA.attrs['units']
+        nt_unit = cip_xds.NT100.attrs['units']
+        mvd_unit = cip_xds.MVD100.attrs['units']
+        mnd_unit = cip_xds.MND100.attrs['units']
+        area_unit = cip_xds.AREA100.attrs['units']
         
         # get longname information from 
-        lwc_ln = cip_xds.LWC.attrs['long_name']
-        iwc_ln = cip_xds.IWC.attrs['long_name']
+        lwc_ln = cip_xds.LWC100.attrs['long_name']
+        iwc_ln = cip_xds.IWC100.attrs['long_name']
         utc_ln = cip_xds.utc_time.attrs['long_name']
         tas_ln = cip_xds.TAS.attrs['long_name']
         conc_ln = cip_xds.CONCENTRATION.attrs['long_name'] 
-        nt_ln = cip_xds.NT.attrs['long_name']
-        mvd_ln = cip_xds.MVD.attrs['long_name']
-        mnd_ln = cip_xds.MND.attrs['long_name']
-        area_ln = cip_xds.AREA.attrs['long_name']
+        nt_ln = cip_xds.NT100.attrs['long_name']
+        mvd_ln = cip_xds.MVD100.attrs['long_name']
+        mnd_ln = cip_xds.MND100.attrs['long_name']
+        area_ln = cip_xds.AREA100.attrs['long_name']
         
-        
+        ''' (take out this)
+        # check if conc_unit is correct: cm-3
+        if nt_unit == '#/m3':
+            nt_ds = nt_ds*10**(-6) #recalculate to per cm^3
+            nt_unit = '#/cm3'
+        '''
         
         # transform time to datetime, adding date from attributes
         sec_temp = pd.to_timedelta(utc_ds, unit='s') #turn utc seconds since midnight into datetime object
@@ -99,15 +115,13 @@ def read_cip_nc():
                                f'IWC ({iwc_unit})':iwc_ds
                                }) #unit information is in the attributes of the xds
         
-        #cip_df.set_index(f'time ({utc_unit})', inplace=True) # Set 'time' as the index
-        cip_df['TWC (gram/m3)'] = cip_df['LWC (gram/m3)']+cip_df['IWC (gram/m3)'] # calculate total water content (LWC + IWC)
-        cip_df['LWC %'] = (cip_df['LWC (gram/m3)']/cip_df['TWC (gram/m3)'])*100 # calculate percentage of LWC 
-        cip_df['flightid']= flight # add flight information to data
+        # add safireid
+        cip_df['safireid']= flight # add flight information to data
         
         # Build a pandas dataframe for the concentration binned
         conc_df = conc_ds.T #transpose the concentration data to have time as row values
         conc_df['UTC seconds'] = utc_ds #add time information (time in original df is just counting seconds from the beginning of measurements)
-        conc_df['flightid']= flight # add fligth information for later handling
+        conc_df['safireid']= flight # add fligth information for later handling
         
         # append lists with the new dataframes:
         cip_bulk_df.append(cip_df) 
@@ -136,5 +150,4 @@ def read_cip_nc():
  
     # Create the pandas DataFrame
     cip_var_df = pd.DataFrame(var_data, columns=['Variable', 'long_name','unit'])
-
     return(cip_bulk_df, cip_conc_df, cip_var_df)

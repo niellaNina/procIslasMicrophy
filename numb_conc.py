@@ -65,4 +65,4 @@ def hist_numb_conc(cdp_bulk_df, cdp_bins_df, cip_bulk_df, cip_bins_df):
     # normalize the values from the log of the bin-width (in m)
     cdp_numb_conc_mean['count_norm'] = cdp_numb_conc_mean['count']/(np.log(cdp_numb_conc_mean['Size (microns)']*1.e-6)-np.log(cdp_numb_conc_mean['Min size']*1.e-6))
     
-    return(cdp_numb_conc, cip_numb_conc)
+    return(cdp_numb_conc_mean, cip_numb_conc_mean)

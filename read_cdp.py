@@ -26,7 +26,7 @@ def read_cdp(nav_df):
     import os #get a list of all directories/files
     
     # functions used fron function.py file
-    from functions import sec_since_midnigth, read_chunky_csv
+    from functions import sec_since_midnigth, read_chunky_csv, resolve_date
     
     # ----- Data ------
     # Read in the CDP files and the NAV files(for temperature and coordinates)
@@ -80,6 +80,12 @@ def read_cdp(nav_df):
             cdp_df.columns = header #add header information to df
             cdp_df["flightid"]=flight # add flight information
             
+            # transform UTC Seconds to datetime, add to time
+            date_temp= resolve_date(cdp_df['Year'], cdp_df['Day of Year'])
+            sec_temp = cdp_df['UTC Seconds'].apply(lambda x: pd.to_timedelta(x, unit='s')) #turn utc seconds since midnight into datetime object
+            cdp_df['time'] = date_temp + sec_temp # add date to the seconds since midnight
+            
+            
             #---- Get metadata from 0th item in cdp_list
             meta = cdp_list[0]
             # flatten the list
@@ -100,6 +106,10 @@ def read_cdp(nav_df):
             meta_df=pd.DataFrame(meta_list, columns=['Metadata'])
             meta_df['Value'] = meta_df['Metadata'].apply(lambda x: x.split('=')[1].strip())
             meta_df['Metadata'] = meta_df['Metadata'].apply(lambda x: x.split('=')[0].strip())
+            # Fix the sample time metadata for later use
+            st = meta_df.loc[meta_df['Metadata'] == 'Sample Time', 'Value'].iloc[0].split(" ")
+            st_sec = {'Metadata': 'Sample Time (sec)', 'Value': int(st[0])}
+            meta_df.loc[len(meta_df)]=st_sec
             
             # Turn bin_list (list of strings) into dataframe of bin information
             # Take entry that includes size or thres, remove the parts of the string that is not values, turn into list
@@ -129,7 +139,7 @@ def read_cdp(nav_df):
             pads_info_df['Info'] = pads_info_df['Info'].apply(lambda x: x.split('=')[0].strip())
 
             # adding NAV information to the cdp data by merging on nearest UTC Seconds. 
-            flight_nav_df = nav_df[nav_df['flightid']==flight]
+            flight_nav_df = nav_df[nav_df['safireid']==flight]
             cdp_nav_df = pd.merge_asof(cdp_df, flight_nav_df[['UTC Seconds','TAS (m/s)']] , on = 'UTC Seconds', direction = 'nearest')
         
             islas_cdp_df.append(cdp_nav_df) # append list with the new dataframe
@@ -158,8 +168,8 @@ def read_cdp(nav_df):
     
     #calculate the sample volume (sample area SA * TAS redused * sample time (1 sek))
     # sample area from meta information and given in mm^2 readjust to m by dividing with 10⁶
-    sa = float(meta_df.loc[meta_df['Metadata'] == 'Sample Area (mm^2)', 'Value']) /(1000*1000)
-    st = 1 #NB should taken from the metadata to avoid constants
+    sa = float(meta_df.loc[meta_df['Metadata'] == 'Sample Area (mm^2)', 'Value'].iloc[0]) /(1000*1000)
+    st = meta_df.loc[meta_df['Metadata'] == 'Sample Time (sec)', 'Value'].iloc[0] 
     islas_cdp_df['SV (m^3)'] = sa * islas_cdp_df['TAS probe reduction (m/s)'] * st
     
     # Get variable information from header of dataframe

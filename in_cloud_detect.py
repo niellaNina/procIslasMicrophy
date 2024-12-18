@@ -5,6 +5,44 @@ Created on Tue Mar 26 08:44:27 2024
 
 @author: ninalar
 """
+def detect_by_limit(limit):
+    test = limit
+
+def detect_from_report(nav_df, report_cloud_df):
+    import numpy as np
+    import pandas as pd
+    
+    # find time in cloud
+    flight = 'as220008' # testing with one flight. Some flights does not have accurate cloud in cloud out listings in flight report
+
+    cloud_df = []
+
+
+    # select nav data from flight
+    nav_test = nav_df[nav_df['flightid']==flight]
+    # select data from cloud_report
+    cloud_test = report_cloud_df[report_cloud_df['flightid']==flight]
+
+    if cloud_test['title'].iloc[0]=='cloud_in': #check if the first entry is going into a cloud
+        for i, g in cloud_test.groupby(np.arange(len(cloud_test)) // 2):
+            cloud = i
+            cloud_in = g['date'].iloc[0],
+            cloud_out = g['date'].iloc[1],
+            total_cloud_time = g['date'].iloc[1]-g['date'].iloc[0],
+            
+            df =  pd.DataFrame({'cloud#': [cloud],
+                                'cloud_in': cloud_in[0],
+                                'cloud_out': cloud_out[0],
+                                'total_cloud_time': total_cloud_time[0],
+                                'flightid': flight
+                                    })
+            cloud_df.append(df)
+            
+    else:
+        print('Did you start the flight in a cloud?')
+
+    # concatenate all the flight dataframes in the list to a new dataframe containing all flights
+    cloud_df = pd.concat(cloud_df)
 
 def all_detect(df,var):
     # Function to detect changepoints in a dataset (using ruptures)
@@ -75,7 +113,7 @@ def single_detect(df,var,flight):
         
     # set up ruptures algoritm to find change points
     algo = rpt.Pelt(model='rbf').fit(flight_df[var].values)
-    result = algo.predict(pen=30)       # returns rows where the changes are detected,
+    result = algo.predict(pen=20)       # returns rows where the changes are detected,
                                         # Penalty decides the sensitivity of the algoritm
                                         # high number detects less points, low number detects more
     # define the plot
@@ -88,4 +126,6 @@ def single_detect(df,var,flight):
     ax.set_ylabel(f'{var}')
     ax.set_xlabel('timesteps (s)')
     ax.set_title(f'Changeplots of {var} on flight {flight}')
-    plt.gcf().axes[0].xaxis.set_major_formatter(xformatter)
+    #plt.gcf().axes[0].xaxis.set_major_formatter(xformatter)
+    
+    return(result)

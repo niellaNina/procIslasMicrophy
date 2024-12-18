@@ -37,7 +37,7 @@ flights = [
 flights = [i for i in flights if i not in drop_flights]
 
 islas_nav_df = []  # empty list for appending all data to one structure
-islas_stats_dict = {}  #empty dictionary for collecting flight stats information
+islas_stats_df = {}  #empty dictionary for collecting flight stats information
 
 for flight in flights:
     # ---- Get NAV data from flight
@@ -90,7 +90,7 @@ for flight in flights:
     # add a new colum to the dataframe that is the time in UTC seconds/seconds from midnigth
     # FUNCTION: sec_since_midnigth: input: datetime-object, output: seconds since midnight as float
     nav_df['UTC Seconds'] = nav_df.index.to_series().map(sec_since_midnigth) 
-    nav_df['flightid']= flight # add flight information to data
+    nav_df['flightid']= flight.astype("category") # add flight information to data
     
     # get stat information for the flight
     stats_dict = {} # temp dictionart

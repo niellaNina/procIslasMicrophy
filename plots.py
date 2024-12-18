@@ -155,3 +155,92 @@ def lwc_cip_cdp_plot(cdp_bulk_df,cip_nc_df):
         ax.legend()
         
     plt.savefig('ISLAS_LWC_IWC.png')
+    
+#------ Figure management functions -----
+def letter_annotation(ax, xoffset, yoffset, letter):
+    # function to add letter/text formatted in a specific way
+    # works within nested subfigure
+        ax.text(xoffset, yoffset, letter, transform=ax.transAxes,size=12, weight='bold')
+        
+        
+# Plotting lat and lon on map
+def plot_map(nav_df, c_flights, flight = "", file_str = ""):
+    # Function to create a map showing the flight paths. Uses set colors and area to plot in. 
+    # INPUT arguments:
+    #   nav_df: dataframe that contains at least the two columns: 'Longitude (degree)' and 'Latitude (degree)'
+    # OPTIONAL INPUT arguments:
+    #   flight: name of single flight to plot. If no flight is added, all flights are plotted.
+    #   file_str: name of file to print plot to. If no file string is added, the plot is not saved.
+    # Additional information:
+    #   Uses global variable: c_flights
+
+    import matplotlib.pyplot as plt
+    import cartopy.crs as ccrs
+    import cartopy.feature as cfeature
+    #-- Map initialization based on flight info --
+
+    # Find the max and min lat and lon in the dataset
+    inc = 1
+    lat_max = nav_df['Latitude (degree)'].max() + inc
+    lat_min = nav_df['Latitude (degree)'].min() - inc
+    lon_max = nav_df['Longitude (degree)'].max() + inc
+    lon_min = nav_df['Longitude (degree)'].min() - inc
+    
+    # coordinates of Andøya
+    #lat_and = 69.3073
+    #lon_and = 16.1312
+    
+    # coordinates of Kiruna
+    lat_kir = 67.8256
+    lon_kir = 20.3351
+
+    # --- Set up figure
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(1, 1, 1, projection=ccrs.NorthPolarStereo())
+    
+    ax.add_feature(cfeature.COASTLINE)
+    ax.add_feature(cfeature.BORDERS, linewidth=2)
+    data_projection = ccrs.PlateCarree()
+    
+    if flight == "":
+        # plot all the flights from ISLAS if "flight" is empty
+        for flight in nav_df['flightid'].unique().sort_values():
+            sel_df = nav_df[nav_df['flightid']==flight] # filtrate on flight
+            date = sel_df.index[0].date() # get the date of the flight
+            ax.plot(sel_df['Longitude (degree)'], sel_df['Latitude (degree)'],
+                label = f'{flight} ({date})', c =c_flights[flight], transform = data_projection)
+    else:
+        # Plot only the given flight if "flight" contains a flightid
+        try:
+            sel_df = nav_df[nav_df['flightid']==flight] # filtrate on flight
+            date = sel_df.index[0].date() # get the date of the flight
+            ax.plot(sel_df['Longitude (degree)'], sel_df['Latitude (degree)'],
+                    label = f'{flight} ({date})', c =c_flights[flight], transform = data_projection)
+        except ValueError:
+            print(f'Flightid: {flight} is not a valid flightid. Needs to be in the format "IS22-XX" where X is a number between 02 and 11')
+     
+    
+    #Plot Andøya on map
+    #ax.plot(lon_and, lat_and, marker='o', color='tab:red', transform=data_projection)
+    #ax.annotate('Andøya', (lon_and, lat_and))
+    
+    #Plot Kiruna on map
+    ax.plot(lon_kir, lat_kir, marker='o', color='tab:red', transform=data_projection)
+    #Add text "Kiruna" at the plotted point
+    offset_lon = 0.7  # adjust the horizontal offset
+    offset_lat = -0.7  # adjust the vertical offset
+    ax.text(lon_kir + offset_lon, lat_kir + offset_lat, "Kiruna", transform=data_projection, ha='right', va='bottom')
+    
+    
+    # --- Drawing a dashed box
+    #lons = [16, 22, 22, 16, 16]
+    #lats = [74, 74, 76, 76, 74]
+    #ax.plot(lons, lats, linestyle='--', color='black', transform=ccrs.PlateCarree())
+    # ---
+    
+    ax.set_extent([lon_min, lon_max, lat_min, lat_max])
+    plt.legend(loc='best')
+    
+    # save figure if filestring is given
+    if file_str !="":
+        plt.savefig(file_str) 

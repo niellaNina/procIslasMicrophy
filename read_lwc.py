@@ -7,7 +7,7 @@ Reading in the LWC files
 
 @author: ninalar
 """
-def read_lwc():
+def read_lwc(nav_df):
     # ---Packages---
     
     # standard data analysis packages: (all packages used in modules must be imported in the module)
@@ -111,8 +111,17 @@ def read_lwc():
             # clean up and separate variable from unit 
             pads_info_df['Value'] = pads_info_df['Info'].apply(lambda x: x.split('=')[1].strip())
             pads_info_df['Info'] = pads_info_df['Info'].apply(lambda x: x.split('=')[0].strip())
+            
+            # adding NAV information to the cdp data by merging on nearest UTC Seconds. 
+            flight_nav_df = nav_df[nav_df['flightid']==flight]
+            lwc_nav_df = pd.merge_asof(lwc_df, flight_nav_df[['UTC Seconds','TAS (m/s)']] , on = 'UTC Seconds', direction = 'nearest')
+            
+            # Adjust the LWC to the actual TAS
+            lwc_nav_df['TAScorr'] = lwc_nav_df['PAS(m/s)']/lwc_nav_df['TAS (m/s)']
+            lwc_nav_df['LWC-calcDAPcorr'] = lwc_nav_df['LWC-CalculatedDAP']*lwc_nav_df['TAScorr']
+        
 
-            islas_lwc_df.append(lwc_df) # append list with the new dataframe
+            islas_lwc_df.append(lwc_nav_df) # append list with the new dataframe
     
     # concatenate all the flight dataframes in the list to a new dataframe containing all flights
     islas_lwc_df = pd.concat(islas_lwc_df)
