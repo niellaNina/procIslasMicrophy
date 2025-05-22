@@ -19,12 +19,13 @@ def read_nav():
     import glob # allows for wildcards in filemanagement
     import os #get a list of all directories/files
     from datetime import datetime
-    import read_flight_report
+   # import read_flight_report
     
     warnings.filterwarnings('ignore', category=DeprecationWarning) # stop the deprecation warnigns from np time management
     
     # functions used fron function.py file
     from functions import sec_since_midnigth
+    from read_flight_report import read_flight_report, find_report_entries, read_flight_report_single
         
     # Local disk path of data:
     main_path = '../2022-islas/' # directory with flight data
@@ -120,8 +121,9 @@ def read_nav():
     
     # ---- adding ISLAS id and separating flight 8
     # Separate flight 8 based on extra landing information from the flight report:
-    file = main_path + 'as220008/CRvol/top_cel_MAIN_24-03-2022_07-33-12_CRvol.csv'
-    f8_report_df = read_flight_report.read_flight_report(file) # read in the flight report from file
+    # read in all flight reports
+    all_reports_df, file_info_dict = read_flight_report()
+    f8_report_df = find_report_entries(all_reports_df, 'as220008') # select the as220008 lines
     
     # find the landing times
     landings = f8_report_df[f8_report_df['title']=='landing']
@@ -156,8 +158,14 @@ def read_nav():
     
     # Separate flight 8 based on extra landing information from the flight report:
     # NB! HARDCODED FILEPATH
-    file = main_path + 'as220008/CRvol/top_cel_MAIN_24-03-2022_07-33-12_CRvol.csv'
-    f8_report_df = read_flight_report.read_flight_report(file) # read in the flight report from file
+    # file = main_path + 'as220008/CRvol/top_cel_MAIN_24-03-2022_07-33-12_CRvol.csv'
+    # f8_report_df = read_flight_report_single(file) # read in the flight report from file
+    
+    
+    # Separate flight 8 based on extra landing information from the flight report:
+    # read in all flight reports
+    all_reports_df, file_info_dict = read_flight_report()
+    f8_report_df = find_report_entries(all_reports_df, 'as220008') # select the as220008 lines
     
     # find the landing times
     landings = f8_report_df[f8_report_df['title']=='landing']
@@ -190,7 +198,7 @@ def read_nav():
         ]
     values = ['IS22-01','IS22-02','IS22-03','IS22-04','IS22-05','IS22-06','IS22-07','IS22-08','IS22-09','IS22-10','IS22-11']
     
-    stats_df['flightid'] = np.select(conditions, values)
+    stats_df['flightid'] = np.select(conditions, values, default = None)
     stats_df['time_in_air'] = stats_df['landing']-stats_df['takeoff'] # add column with time in air for the flights
     
     
@@ -211,9 +219,18 @@ def read_nav():
         (islas_nav_df['safireid']=='as220015')
         ]
     
-    islas_nav_df['flightid'] = np.select(conditions, values)
+    islas_nav_df['flightid'] = np.select(conditions, values, default = None)
     islas_nav_df['flightid'] = islas_nav_df['flightid'].astype("category") # make sure that flight is of type "category")
     
+    # areal extent of full dataset
+    extra_info = {
+        'lat_max': islas_nav_df['Latitude (degree)'].max() + 1,
+        'lat_min': islas_nav_df['Latitude (degree)'].min() - 1,
+        'lon_max': islas_nav_df['Longitude (degree)'].max() + 1,
+        'lon_min': islas_nav_df['Longitude (degree)'].min() - 1,
+        'ext_landing': extra_landing_time,
+        'ext_takeoff': extra_takeoff_time
+    }
        
-    return(islas_nav_df, stats_df)
+    return(islas_nav_df, stats_df, extra_info)
     

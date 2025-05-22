@@ -157,10 +157,10 @@ def lwc_cip_cdp_plot(cdp_bulk_df,cip_nc_df):
     plt.savefig('ISLAS_LWC_IWC.png')
     
 #------ Figure management functions -----
-def letter_annotation(ax, xoffset, yoffset, letter):
+def letter_annotation(ax, xoffset, yoffset, letter, size=12):
     # function to add letter/text formatted in a specific way
     # works within nested subfigure
-        ax.text(xoffset, yoffset, letter, transform=ax.transAxes,size=12, weight='bold')
+        ax.text(xoffset, yoffset, letter, transform=ax.transAxes,size=size, weight='bold')
         
         
 # Plotting lat and lon on map
@@ -244,3 +244,130 @@ def plot_map(nav_df, c_flights, flight = "", file_str = ""):
     # save figure if filestring is given
     if file_str !="":
         plt.savefig(file_str) 
+
+def plot_lat_bands1(lat_bands, ds, title, savefile = ''):
+    # Function to plot latitude bands used for further analysis
+    # Input: 
+    # --- lat_bands: array of the the latitudes used for separation, should include at least min and max latitude
+    # --- ds: full original dataset for plotting flightpaths
+    # --- title: title to add to plot
+    # --- savefile(optional): path and filename to save plot into
+
+    # functions
+    import cartopy.crs as ccrs
+    import cartopy.feature as cfeature
+    import matplotlib.pyplot as plt
+    from matplotlib.gridspec import GridSpec # gridspec for nested subfigures
+
+    # coordinates of Kiruna
+    lat_kir = 67.8256
+    lon_kir = 20.3351
+    
+    # --- Set up figure
+    fig = plt.figure(figsize=(15, 6))
+    gs = GridSpec(1, 2, figure=fig)
+    ax = fig.add_subplot(gs[0,0], projection=ccrs.NorthPolarStereo())
+
+    ax.add_feature(cfeature.COASTLINE)
+    ax.add_feature(cfeature.BORDERS, linewidth=2)
+    data_projection = ccrs.PlateCarree()
+
+    # get datavalues for plotting
+    lat_values = ds['lat'].values
+    lon_values = ds['lon'].values
+    incloud_values = ds['in_cloud'].values 
+
+    # select out just where incloud is set to true
+    sel_mask = (ds['in_cloud'] == True).compute()
+    sel_ds = ds.where(sel_mask, drop=True)
+    sel_lat_values = sel_ds['lat'].values
+    sel_lon_values = sel_ds['lon'].values
+
+    #ax.scatter(lon_values, lat_values, marker='.',c=incloud_values, transform = data_projection)
+    ax.scatter(lon_values, lat_values, marker='.',c='darkgrey', label='Flight path', transform = data_projection)
+    ax.scatter(sel_lon_values, sel_lat_values, marker='o',c='navy', label='In cloud', transform = data_projection)
+
+    # Draw latitude bands
+    for lat_band in lat_bands:
+        ax.plot(range(0, 51, 5), [lat_band]*11, color='k', transform=ccrs.PlateCarree())
+        if lat_band in [lat_min, lat_max]:
+            lat_text = round(lat_band, 2)
+        else:
+            lat_text = lat_band
+        ax.text(28, lat_band-0.7, f"{lat_text:.2f}°", transform=ccrs.PlateCarree(), ha='center', va='bottom', fontsize=15, color='blue',
+            bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
+
+    #Plot Kiruna 
+    ax.plot(lon_kir, lat_kir, marker='o', color='tab:red', transform=data_projection)
+    offset_lon = 0.7  # adjust the horizontal offset
+    offset_lat = -0.7  # adjust the vertical offset
+    ax.text(lon_kir + offset_lon, lat_kir + offset_lat, "Kiruna", transform=data_projection, ha='right', va='bottom')
+
+    # set extent of the plot to the full area covered by the dataset +/- an increment of 1
+    ax.set_extent([ds.lon.values.min()-1, ds.lon.values.max()+1, ds.lat.values.min()-1, ds.lat.values.max()+1])
+    
+    ax.set_title(f'Latitude bands: {title}')
+
+    plt.legend()
+    
+    if savefile !='':
+        plt.savefig(savefile)
+        
+def lat_3band_select(lat_bands, ds):
+    # Function to extract information about the content of the latitude bands
+    # Input: 
+    # --- lat_bands: array of the the latitudes used for separation, should include min, max and two other latitudes
+    # --- ds: dataset to do the summarization on, that includes 'lat'
+
+    lat_min, lat_b1, lat_b2, lat_max = lat_bands # unpack lat selection
+    
+    # count number of values between different latitudes and add do dictionary
+    lat_values = ds['lat']  # Access the latitude coordinate
+    count_dict = {'count_low': ((lat_values >= lat_min) & (lat_values <= lat_b1)).sum().item(),
+                  'count_mid': ((lat_values >= lat_b1) & (lat_values <= lat_b2)).sum().item(),
+                  'count_high': ((lat_values >= lat_b2) & (lat_values <= lat_max)).sum().item(),
+                 'lat_bands': lat_bands}
+
+    #print(f'count_low: {count_dict['count_low']},count_mid: {count_dict['count_mid']},count_high: {count_dict['count_high']}')
+
+    # Compute the boolean masks for latitude conditions
+    lat_mask_high = (ds['lat'] < lat_max) & (ds['lat'] >= lat_b2)
+    lat_mask_mid = (ds['lat'] < lat_b2) & (ds['lat'] >= lat_b1)
+    lat_mask_low = (ds['lat'] < lat_b1) & (ds['lat'] >= lat_min)
+
+    # Filter the dataset on masks
+    ds_filtered_high = ds.where(lat_mask_high, drop=True)
+    ds_filtered_mid = ds.where(lat_mask_mid, drop=True)
+    ds_filtered_low = ds.where(lat_mask_low, drop=True)
+
+    print(f'number of values in 3 bands defined by {lat_bands}:')
+    print(f'count_low: {len(ds_filtered_low.lat)},count_mid: {len(ds_filtered_mid.lat)},count_high: {len(ds_filtered_high.lat)}')
+    
+    return ds_filtered_high, ds_filtered_low, ds_filtered_mid, count_dict
+def lat_2band_select(lat_bands, ds):
+    # Function to extract information about the content of the latitude bands
+    # Input: 
+    # --- lat_bands: array of the the latitudes used for separation, should include min, max and one other latitude
+    # --- masks: masks to use to select data
+
+    lat_min, lat_mid, lat_max = lat_bands # unpack lat selection
+    
+    # count number of values between different latitudes and add to dictionary
+    lat_values = ds['lat']  # Access the latitude coordinate
+    count_dict = {'count_south': ((lat_values >= lat_min) & (lat_values <= lat_mid)).sum().item(),
+                  'count_north': ((lat_values >= lat_mid) & (lat_values <= lat_max)).sum().item(),
+                 'lat_bands': lat_bands}
+
+    # Compute the boolean masks for latitude conditions
+    lat_mask_north = (ds['lat'] < lat_max) & (ds['lat'] >= lat_mid)
+    lat_mask_south = (ds['lat'] < lat_mid) & (ds['lat'] >= lat_min)
+
+    # Filter the dataset on masks
+    ds_filtered_north = ds.where(lat_mask_north, drop=True)
+    ds_filtered_south = ds.where(lat_mask_south, drop=True)
+
+    print(f'number of values in 2 bands defined by {lat_bands}:')
+    print(f'count_south: {len(ds_filtered_south.lat)},count_north: {len(ds_filtered_north.lat)}')
+    
+    #return ds_filtered_north, ds_filtered_south, count_dict
+    return lat_mask_north, lat_mask_south, count_dict

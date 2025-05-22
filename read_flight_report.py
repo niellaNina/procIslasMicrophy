@@ -68,6 +68,16 @@ def read_flight_report():
     
     return(all_reports_df, file_info_dict)
 
+def read_flight_report_single(file):
+    import pandas as pd
+    from functions import read_chunky_csv
+    # reading in flight report as chunky csv    
+    fr_list = read_chunky_csv(file)
+    # store flightreport entries as dataframe
+    headers = pd.DataFrame(fr_list[1]).iloc[0]
+    report_df  = pd.DataFrame(pd.DataFrame(fr_list[1]).values[1:], columns=headers)
+    return(report_df)
+
 
 def find_report_entries(df, str_new):
     # Search a dataframe for specific string 
