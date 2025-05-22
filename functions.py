@@ -557,3 +557,338 @@ def prep_numb_conc(cdp_bulk_df, cdp_bins_df, cip_bulk_df, cip_bins_df):
     cdp_numb_conc_mean['count_norm'] = cdp_numb_conc_mean['count']/(np.log(cdp_numb_conc_mean['Size (microns)']*1.e-6)-np.log(cdp_numb_conc_mean['Min size']*1.e-6))
     
     return(cdp_numb_conc, cip_numb_conc)
+
+def safireid_to_islasid(df, extra_landing):
+    # Function to add islasid to df based on 'safireid' and extra landing information
+    import numpy as np
+    
+    # check if 'safireid' and 'time' are columns in df
+    if set(['safireid','time']).issubset(df.columns):
+
+        # if based on time column
+        conditions = [
+            (df['safireid']=='as220006'),
+            (df['safireid']=='as220007'),
+            (df['safireid']=='as220008') & (df['time'] <= extra_landing),
+            (df['safireid']=='as220008') & (df['time'] > extra_landing),
+            (df['safireid']=='as220009'),
+            (df['safireid']=='as220010'),
+            (df['safireid']=='as220011'),
+            (df['safireid']=='as220012'),
+            (df['safireid']=='as220013'),
+            (df['safireid']=='as220014'),
+            (df['safireid']=='as220015')
+            ]
+        
+        # New flightids
+        values = ['IS22-01','IS22-02','IS22-03','IS22-04','IS22-05','IS22-06','IS22-07','IS22-08','IS22-09','IS22-10','IS22-11']
+        
+        df['flightid'] = np.select(conditions, values, default = None) # create new column with the new fligthids
+        df['flightid'] = df['flightid'].astype("category") # make sure that flight is of type "category")
+    else:
+        # Return useable errormessage (TODO)
+        print('ERROR: missing columns safireid and time')
+    
+    return df
+
+def update_land(row):
+    # Function to use globe_land_mask to check each lat, lon pair if land.
+    # Returns the original value of 'surface_cond' if not land and 'land' if land
+
+    # import package
+    from global_land_mask import globe
+    
+    if globe.is_land(row['Latitude (degree)'], row['Longitude (degree)']):
+        return 'land'
+    return row['surface_cond']
+
+
+
+def cdp_df_to_netcdf(cdp_nav_df, cdp_list, meta_df, chan_list, bins_df, source_files, path_store):
+    # function to turn the results from the function read_cdp into a netcdf file
+    # INPUT: 
+    # -- cdp_nav_df: dataframe with combined cdp and nav observations
+    # -- cdp_list: metadata with pads information
+    # -- meta_df: metadata with instrument information
+    # -- chan_list: metadata with channel information
+    # -- source_files: csv-files used to generate the cdp_nav_df
+    # -- path_store: where to store the netcdf file
+    # OUTPUT:
+    # --ds: Returns the dataset generated
+    
+
+    # Imports
+    import xarray as xr
+    import pandas as pd
+    
+    
+    # Gather the Bin counts in one df, for 2D xr.DataArray
+    bin_count_df = cdp_nav_df[['CDP Bin 1','CDP Bin 2', 'CDP Bin 3', 'CDP Bin 4', 'CDP Bin 5', 'CDP Bin 6','CDP Bin 7', 'CDP Bin 8', 'CDP Bin 9', 'CDP Bin 10', 'CDP Bin 11','CDP Bin 12', 'CDP Bin 13', 'CDP Bin 14', 'CDP Bin 15', 'CDP Bin 16','CDP Bin 17', 'CDP Bin 18', 'CDP Bin 19', 'CDP Bin 20', 'CDP Bin 21','CDP Bin 22', 'CDP Bin 23', 'CDP Bin 24', 'CDP Bin 25', 'CDP Bin 26','CDP Bin 27', 'CDP Bin 28', 'CDP Bin 29', 'CDP Bin 30']]
+    
+    # Creating coordinates for the cdp data
+    coords = {
+        'time': cdp_nav_df['time'],
+        'lat': ('time', cdp_nav_df['Latitude (degree)']),
+        'lon': ('time', cdp_nav_df['Longitude (degree)']),
+        'alt': ('time', cdp_nav_df['Altitude (meter)'])
+    }
+    
+    # drop duplicate times
+    # remove any duplicated times
+    cdp_nav_df = cdp_nav_df[~cdp_nav_df['time'].duplicated(keep='first')]
+
+    ds = xr.Dataset({
+        # variables with dimension 'time'
+        'End Seconds': xr.DataArray(data = cdp_nav_df['End Seconds'], dims = ['time'],coords = coords,attrs  = {}),
+        'Day of Year': xr.DataArray(data = cdp_nav_df['Day of Year'], dims = ['time'],coords = coords,attrs  = {}),
+        'Year': xr.DataArray(data = cdp_nav_df['Year'], dims = ['time'],coords = coords,attrs  = {}),
+        'Status': xr.DataArray(data = cdp_nav_df['Status'], dims = ['time'],coords = coords,attrs  = {}),
+        'DOF Reject Counts': xr.DataArray(data = cdp_nav_df['DOF Reject Counts'], dims = ['time'],coords = coords,attrs  = {}),
+        'Avg Transit Reject': xr.DataArray(data = cdp_nav_df['Avg Transit Reject'], dims = ['time'],coords = coords,attrs  = {}),
+        'Avg Transit Time': xr.DataArray(data = cdp_nav_df['Avg Transit Time'], dims = ['time'],coords = coords,attrs  = {}),
+        'DT Bandwidth': xr.DataArray(data = cdp_nav_df['DT Bandwidth'], dims = ['time'],coords = coords,attrs  = {}),
+        'Dynamic Threshold': xr.DataArray(data = cdp_nav_df['Dynamic Threshold'], dims = ['time'],coords = coords,attrs  = {}),
+        'ADC Overflow': xr.DataArray(data = cdp_nav_df['ADC Overflow'], dims = ['time'],coords = coords,attrs  = {}),
+        'Laser Current': xr.DataArray(data = cdp_nav_df['Laser Current (mA)'], dims = ['time'],coords = coords,attrs  = {'unit': 'mA'}),
+        'Dump Spot Monitor': xr.DataArray(data = cdp_nav_df['Dump Spot Monitor (V)'], dims = ['time'],coords = coords,attrs  = {'unit': 'V'}),
+        'Wingboard Temp': xr.DataArray(data = cdp_nav_df['Wingboard Temp (C)'], dims = ['time'],coords = coords,attrs  = {'unit': 'C'}),
+        'Laser Temp': xr.DataArray(data = cdp_nav_df['Laser Temp (C)'], dims = ['time'],coords = coords,attrs  = {'unit': 'C'}),
+        'Sizer Baseline': xr.DataArray(data = cdp_nav_df['Sizer Baseline (V)'], dims = ['time'],coords = coords,attrs  = {'unit': 'V'}),
+        'Qualifier Baseline': xr.DataArray(data = cdp_nav_df['Qualifier Baseline (V)'], dims = ['time'],coords = coords,attrs  = {'unit': 'V'}),
+        '5V Monitor': xr.DataArray(data = cdp_nav_df['+5V Monitor (V)'], dims = ['time'],coords = coords,attrs  = {'unit': 'V', 'name': '+5V Monitor'}),
+        'Control Board T': xr.DataArray(data = cdp_nav_df['Control Board T (C)'], dims = ['time'],coords = coords,attrs  = {'unit': 'C'}),
+        'Number Conc': xr.DataArray(data = cdp_nav_df['Number Conc (#/cm^3)'], dims = ['time'],coords = coords,
+                                    attrs  = {'longname':'Particle number concentration','unit': '#/cm^3', 'range': [0,2000]}),
+        'LWC': xr.DataArray(data = cdp_nav_df['LWC (g/m^3)'], dims = ['time'],coords = coords,
+                            attrs  = {'longname': 'Liquid Water Content','unit': 'g/m^3'}),    
+        'MVD': xr.DataArray(data = cdp_nav_df['MVD (um)'], dims = ['time'],coords = coords,
+                            attrs  = {'longname':'Median Volume Diameter','unit': 'um'}),
+        'ED': xr.DataArray(data = cdp_nav_df['ED (um)'], dims = ['time'],coords = coords,
+                           attrs  = {'longname':'Effective diameter','unit': 'um'}),
+        'Applied PAS': xr.DataArray(data = cdp_nav_df['Applied PAS (m/s)'], dims = ['time'],coords = coords,attrs  = {'unit': 'm/s', 'description' : 'Probe Air Speed (PAS) used during data collection for adjusting variables'}),
+        'TAS': xr.DataArray(data = cdp_nav_df['TAS (m/s)'], dims = ['time'],coords = coords,attrs  = {'unit': 'm/s', 'description':'True Air Speed (TAS) from navigational data'}),
+        # variables with dimesion 'bin'
+        'Bin_min':xr.DataArray(data = bins_df['Min size'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'unit': 'um', 'description':'Lower bin size'}),
+        'Size':xr.DataArray(data = bins_df['Size (microns)'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'unit': 'um', 'description':'Upper bin size'}),
+        'Threshold':xr.DataArray(data = bins_df['Threshold'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'description':'Upper ADC Threshold'}),
+        'Width':xr.DataArray(data = bins_df['Width'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'description':'Bin width'}),
+        'CDP Bin Particle Count': xr.DataArray(data = bin_count_df,dims = ['time','CDP_Bin'],coords = {'time': cdp_nav_df['time'], 'lat': ('time', cdp_nav_df['Latitude (degree)']),'lon': ('time', cdp_nav_df['Longitude (degree)']), 'alt': ('time', cdp_nav_df['Altitude (meter)']), 'CDP_Bin': bins_df.index},attrs = {'description': 'Number of particles detected in each of the CDP sizing bins during the current sampling interval.'})   
+        },
+            attrs = {'description': 'Updated CDP data from a single flight during the ISLAS campaign in 2022. Nav-information (time, lat, lon, alt, TAS and islasid) is added to raw cdp data. TAS-corrected LWC and number concentration is added',
+                     'safireid': cdp_nav_df['safireid'].unique()[0],
+                    'islasid': cdp_nav_df['flightid'].unique()[0],
+                    'source files': source_files}
+        )
+
+    # --- Data corrections
+
+    # -- CDP: adjust bulk parameters for TAS
+    # calculate TAS correction factor for each timestep
+    # (aircraft TAS - 13%)/PAS from probe calculations from Frey(2011)
+    ds['TAS reduce'] = 0.87*ds['TAS'] # reduce TAS due to airflow (-13%)
+    ds['TAS reduce'] = ds['TAS reduce'].assign_attrs({'name': 'TAS probe reduction',
+                                                       'unit': 'm/s', 
+                                                       'description': 'TAS - 13%, intermediate step of calculating probe reduction factor, from Frey 2011', 'parent variables': ['TAS']})
+    ds['TAS correction factor'] = ds['TAS reduce']/ds['Applied PAS']
+    ds['TAS correction factor'] = ds['TAS correction factor'].assign_attrs({'name':'TAS correction factor',
+                                                                           'description': 'Correction factor for TAS depended variables. (aircraft TAS - 13%)/PAS from probe calculations from Frey(2011)',
+                                                                           'parent variables':['Applied PAS','TAS reduce'] })
+    # adjust the Numb conc and the LWC parameters with the correction factor
+    # (MVD and ED is not dependent on TAS)
+    ds['Number Conc corr'] = ds['Number Conc']/ds['TAS correction factor']
+    ds['Number Conc corr']=ds['Number Conc corr'].assign_attrs({'name':'Number concentration TAS corrected',
+                                                                'unit':'#/cm^3',
+                                                                'description': 'Number concentration corrected with the TAS correction factor',
+                                                               'parent variables':['Number Conc','TAS correction factor'] })
+    ds['LWC corr'] = ds['LWC']/ds['TAS correction factor']
+    ds['LWC corr']=ds['LWC corr'].assign_attrs({'name':'Liquid water content TAS corrected',
+                                                                'unit':'g/m^3',
+                                                                'description': 'Liquid water content corrected with the TAS correction factor',
+                                                               'parent variables':['LWC','TAS correction factor'] })
+    
+    # UPDATING METADATA/ATTRIBUTES
+    # Add PADS metadata (from the second item of cdp_list)
+    for item in cdp_list:
+        # Create key-value pairs by splitting each item on =
+        key, value = item[0].split('=', 1)
+        # add as attributes to xarray
+        ds = ds.assign_attrs({key.strip():value.strip()}) # strip to remove leading and trailing whitespace
+
+    # ADD instrument metadata to attributes
+    for index, row in meta_df.iterrows():
+        ds = ds.assign_attrs({row['Metadata']:row['Value']})
+    
+    # ADD housekeeping channel information as attributes to the housekeeping channels
+    ds = ds.assign_attrs({'Housekeeping channel description': 'The first 8 channels in the original data packet are analog-to-digital signals that must be converted by the data system (e.g., PADS) into meaningful numbers. The data arrive in hex format. PADS or another data system must then use a scaling algorithm specified within the program to yield results such as laser current, dump spot monitor voltage, etc.'})
+    
+    # Prepare lists to collect the parsed information
+    channels = []
+    names = []
+    equations = []
+    coefficients = []
+    
+    # Iterate over the list and parse each attribute
+    for line in chan_list[1:]:  # Skip the first line 'Channels=<8>'
+        parts = line.split('=')
+        if 'Name' in line:
+            channels.append(parts[0].split()[1].split('.')[0])
+            names.append(parts[1].lstrip('+'))
+        elif 'Equation' in line:
+            equations.append(parts[1])
+        elif 'Coefficients' in line:
+            coefficients.append(parts[1].lstrip('<5>').strip())
+    
+    # Create a DataFrame
+    df = pd.DataFrame({
+        'channel': channels,
+        'Name': names,
+        'Equation': equations,
+        'Coefficients': coefficients
+    })
+    
+    for index, row in df.iterrows():
+        var = row['Name'].split('(')[0].strip() # get variable name by removing unit
+        ds[var] = ds[var].assign_attrs({'Housekeeping channel number': row['channel'], 'longname':row['Name'],'Equation scaling algorithm':row['Equation'], 'Coefficients':row['Coefficients']})
+
+    #calculate the sample volume (sample area SA * TAS redused * sample time (1 sek))
+    # sample area from meta information and given in mm^2 readjust to m by dividing with 10⁶
+    sa = float(ds.attrs['Sample Area (mm^2)']) /(1000*1000)
+    st = ds.attrs['Sample Time (sec)']
+    ds['SV'] = sa * ds['TAS reduce'] * st
+    ds['SV']=ds['SV'].assign_attrs({'name':'Sample volume',
+                                    'unit':'m^3',
+                                    'description': 'Sample volume calculated (sample area SA * TAS redused * sample time (1 sek))',
+                                    'parent variables':['TAS reduce'],
+                                    'parent attributes': ['Sample Time (sec)','Sample Area (mm^2)'] })
+    
+    # save as netcdf
+    print(f'{path_store}CDP_updated_{ds.attrs['islasid']}.nc')
+    ds.to_netcdf(f'{path_store}CDP_updated_{ds.attrs['islasid']}.nc','w')
+    
+    return ds
+        
+
+def find_unique_listkey(dict, sub_key):
+    values = []
+    
+    for key in dict:
+        #print(dict[key].keys())
+        if sub_key in dict[key].keys():
+          values.append(dict[key][sub_key][0])
+    
+    # Return all unique values
+    return set(values)
+
+def floor_to_sec_res(ds, time_dim):
+    # function to floor the time to whole seconds
+    import pandas as pd
+    # Convert to pandas datetime index
+    datetime_index = pd.to_datetime(ds[time_dim].values) # turn into datetime index
+    floored_time = datetime_index.floor('s') # floor on seconds
+
+    return ds.assign_coords({time_dim: floored_time})
+
+def reduce_to_bin_dim(ds):
+    # function to reduce away the time dimension for variables that are consistent over time
+    # for the selection of variables that are not actually time dependent
+    # -- some datavariables have only one of the binning dimensions (Vector64, Vector40 or CDP Bin) as dimensions.
+    # these datavariables describe some element of the binning categories and are the same throughout the datasets.
+    # during the joining, the time dimension is unnecessarily added to these varables. This part of the code reduces the dimensions of these 
+    # variables back to only the binning dimensions:
+    # Variables: MIDBINS (Vector64),SA (Vector64),INTMIDBINS (Vector40),Bin_min (CDP_Bin),Size (CDP_Bin),Threshold (CDP_Bin),Width (CDP_Bin)
+
+    import numpy as np
+    
+    for var in ['Size','Bin_min','MIDBINS','SA','INTMIDBINS','Threshold','Width']:
+       if 'time' in ds[var].dims:
+          # if time is a dimension for this variable
+          ds[var]=ds[var].reduce(np.median,dim='time',keep_attrs=True) # reduce time dimension
+    return ds
+
+def alt_cat_separator(ds, outer_layers=2, num_layer =2, precip=True):
+    # Function to take the altitude bins form a dataset and divide them into different altitude categories for selecting data
+    # INPUT:
+    # --- ds: dataset in xarray format. Needs to have the value 'altitude_bin'
+    # --- outer_layers: number of bins to put in 'top' and 'base' category. Default = 2
+    # --- precip: whether or not the lowest layer should be considered precip and get its own category. Default = True
+    # OUTPUT:
+    # --- precip_list: list of the bin to be considered precip
+    # --- base_list: list of the bins to be considered base of cloud
+    # --- bulk_list: list of the bins to be considered bulk of cloud
+    # --- top_list: list of the bins to be considered top of cloud
+    # --- alt_cats: list of all bins
+
+    import numpy as np
+    
+    alt_cats = np.unique(ds['altitude_bin'].values).tolist() # create list of the unique altitude bins
+    
+    l = len(alt_cats) # Number of categories
+    if precip == True:
+        print('creating categories, including precip layer')
+        if num_layer == 2:
+            l_min = 2 + (outer_layers*2) # minimum number of layers is 2 times the number of outer layers and 1 layer for precip and one layer for bulk
+            if l >= l_min:
+                # there is enough layers to use the given number of outer layers
+                precip_list = alt_cats[0:1]
+                base_list = alt_cats[1:(1+outer_layers)]
+                bulk_list = alt_cats[3:(l-outer_layers)]
+                top_list = alt_cats[(l-outer_layers):l]
+            elif l == 4 :
+                print('WARNING: the number of altitude categories only allow for one layer per category!')
+                precip_list = alt_cats[0:1]
+                base_list = alt_cats[1:2]
+                bulk_list = alt_cats[2:3]
+                top_list = alt_cats[3:4]
+            else:
+                print('ERROR: two few altitude categories, check data')
+                return
+            return precip_list,base_list,bulk_list,top_list,alt_cats
+        elif num_layer == 1:
+            l_min = 2 + outer_layers # minimum number of layers is 2 times the number of outer layers and 1 layer for precip and one layer for bulk
+            if l >= l_min:
+                # there is enough layers to use the given number of outer layers
+                precip_list = alt_cats[0:1]
+                bulk_list = alt_cats[1:(l-outer_layers)]
+                top_list = alt_cats[(l-outer_layers):l]
+            elif l == 4 :
+                print('WARNING: the number of altitude categories only allow for one layer per category!')
+                precip_list = alt_cats[0:1]
+                bulk_list = alt_cats[1:3]
+                top_list = alt_cats[3:4]
+            else:
+                print('ERROR: two few altitude categories, check data')
+                return
+            return precip_list,bulk_list,top_list,alt_cats
+    else:
+        print('Creating categories, without precip layer')
+        if num_layer == 2:
+            l_min = 1 + (outer_layers*2) # minimum number of layers is 2 times the number of outer layers and one layer for bulk
+            if l >= l_min:
+                # there is enough layers to use the given number of outer layers
+                base_list = alt_cats[0:outer_layers+1]
+                bulk_list = alt_cats[outer_layers:(l-outer_layers+1)]
+                top_list = alt_cats[(l-outer_layers):l]
+            elif l == 3 :
+                print('WARNING: the number of altitude categories only allow for one layer per category!')
+                base_list = alt_cats[0:1]
+                bulk_list = alt_cats[1:2]
+                top_list = alt_cats[2:3]
+            else:
+                print('ERROR: two few altitude categories, check data')
+                return
+            return base_list,bulk_list,top_list,alt_cats
+        elif num_layer == 1:
+            l_min = 1 + outer_layers # minimum number of layers is 2 times the number of outer layers and one layer for bulk
+            if l >= l_min:
+                # there is enough layers to use the given number of outer layers
+                bulk_list = alt_cats[0:(l-outer_layers)]
+                top_list = alt_cats[(l-outer_layers):l]
+            elif l == 3 :
+                print('WARNING: the number of altitude categories only allow for one layer per category!')
+                bulk_list = alt_cats[0:2]
+                top_list = alt_cats[2:3]
+            else:
+                print('ERROR: two few altitude categories, check data')
+                return
+            return bulk_list,top_list,alt_cats
+        
