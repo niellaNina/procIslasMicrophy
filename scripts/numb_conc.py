@@ -16,7 +16,7 @@ import xarray as xr
 
 
 # imports from files
-import functions
+import notebooks.functions as functions
 
 
 # --- Histogram for concentration per size bin

@@ -24,7 +24,7 @@ def read_nav():
     warnings.filterwarnings('ignore', category=DeprecationWarning) # stop the deprecation warnigns from np time management
     
     # functions used fron function.py file
-    from functions import sec_since_midnigth
+    from notebooks.functions import sec_since_midnigth
     from read_flight_report import read_flight_report, find_report_entries, read_flight_report_single
         
     # Local disk path of data:

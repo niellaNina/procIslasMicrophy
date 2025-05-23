@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 
 # imports from files
-import functions
+import notebooks.functions as functions
 import read_cdp
 import read_cip_txt
 import read_lwc

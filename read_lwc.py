@@ -20,7 +20,7 @@ def read_lwc(nav_df):
     import os #get a list of all directories/files
     
     # functions used fron function.py file
-    from functions import read_chunky_csv
+    from notebooks.functions import read_chunky_csv
     
     # ----- Data ------
     # Read in the CDP files and the NAV files(for temperature and coordinates)

@@ -20,7 +20,7 @@ import os #get a list of all directories/files
 warnings.filterwarnings('ignore', category=DeprecationWarning) # stop the deprecation warnigns from np time management
 
 # functions used fron function.py file
-from functions import sec_since_midnigth
+from notebooks.functions import sec_since_midnigth
 
 # Local disk path of data:
 main_path = '../2022-islas/' # directory with flight data

@@ -9,7 +9,7 @@ Commented functions have no testing yet
 @author: ninalar
 """
 
-from functions import sec_since_midnigth
+from notebooks.functions import sec_since_midnigth
 import pytest
 import datetime as dt
 
