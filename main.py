@@ -18,7 +18,7 @@ import read_cip_txt
 import read_lwc
 import notebooks.read_nav as read_nav
 import read_cip_nc
-import plots
+import notebooks.plots as plots
 import numb_conc
 import in_cloud_detect
 #import read_fligth_report
