@@ -16,7 +16,7 @@ import notebooks.functions as functions
 import read_cdp
 import read_cip_txt
 import read_lwc
-import read_nav
+import notebooks.read_nav as read_nav
 import read_cip_nc
 import plots
 import numb_conc

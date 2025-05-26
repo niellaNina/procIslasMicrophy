@@ -16,7 +16,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 
 
-import read_nav
+import notebooks.read_nav as read_nav
 
 
 def read_seaice(df, campaign_coord_limits, plot_all=False):
