@@ -99,11 +99,17 @@ def cip_mean_norm_Nt(ds: xr.Dataset)-> xr.DataArray:
     unnorm_conc = ds['CONCENTRATION'].T* binwidth 
 
     # log normalize the values
-    cip_part_mean = unnorm_conc.mean(dim='time')
     log_norm_width = np.log(upper_limits*1.e-6)-np.log(lower_limits*1.e-6)
-    cip_part_norm = cip_part_mean/log_norm_width  #normalize to bin width
 
-    return cip_part_norm
+    #mean
+    cip_part_mean = unnorm_conc.mean(dim='time')
+    cip_part_mean_norm = cip_part_mean/log_norm_width  #normalize to bin width
+
+    #median
+    cip_part_med = unnorm_conc.median(dim='time')
+    cip_part_med_norm = cip_part_med/log_norm_width  #normalize to bin width
+
+    return cip_part_mean_norm, cip_part_med_norm
 
     
 def cdp_mean_norm_Nt(ds):
@@ -132,11 +138,14 @@ def cdp_mean_norm_Nt(ds):
     
     # summary statistics over time
     cdp_part_mean = cdp_part_adj.mean(dim='time')
+    cdp_part_med = cdp_part_adj.median(dim='time')
 
     # log normalize the cdp particle counts to width (Size = upper limit of bin, Bin_min = lower limit of bin)
     # bin units are in micrometers and must be adjusted to m
     log_norm_width = np.log(ds['Size']*1.e-6)-np.log(ds['Bin_min']*1.e-6)
-    cdp_part_norm = cdp_part_mean/log_norm_width  #normalize to bin width
+    cdp_part_mean_norm = cdp_part_mean/log_norm_width  #normalize to bin width
+    cdp_part_med_norm = cdp_part_med/log_norm_width  #normalize to bin width
+
 
     
-    return cdp_part_norm.T #return transposed to get the correct shape
+    return cdp_part_mean_norm.T, cdp_part_med_norm.T #return transposed to get the correct shape
