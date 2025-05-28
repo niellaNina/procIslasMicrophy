@@ -9,12 +9,23 @@ Scripts related to number concentration
 @author: ninalar
 """
 
+def unnormalize(count_value, binwidth):
+    # Function to unnormalize a size spectra
+    # INPUT:
+        # - count_value: a size spectra/concentration in m^-4
+        # - endbins: bin endpoints in micro-m 
+    # OUTPUT:
+        # - unnorm_count_value: the unnormalized size spectra/concentration (in m⁻3)
+    unnorm_count_value = count_value*binwidth/1.0e6 # divide by 10e^6 to get m istead of micro-m 
+    
+    return(unnorm_count_value)
+    
+
 # --- Histogram for concentration per size bin
 # Need the number concentration data for both instruments (CIP and CDP) and their bin information:
 def hist_numb_conc(cdp_bulk_df, cdp_bins_df, cip_bulk_df, cip_bins_df):
     import pandas as pd
     import numpy as np
-    import xarray as xr
 
     # Prepare number concentration data for histogram
     
@@ -35,7 +46,7 @@ def hist_numb_conc(cdp_bulk_df, cdp_bins_df, cip_bulk_df, cip_bins_df):
     #cip_numb_conc_mean =  cip_numb_conc_mean[cip_numb_conc_mean['Bin midpoints (microns):'] >= 100]
   
     # the cip bin counts are normalized by bin width, unnormalize
-    cip_numb_conc_mean['unnorm'] = functions.unnormalize(cip_numb_conc_mean['count'], (cip_numb_conc_mean['Bin endpoints (microns):']-cip_numb_conc_mean['Bin startpoints (microns)']))
+    cip_numb_conc_mean['unnorm'] = unnormalize(cip_numb_conc_mean['count'], (cip_numb_conc_mean['Bin endpoints (microns):']-cip_numb_conc_mean['Bin startpoints (microns)']))
     # log normalize cip data
     cip_numb_conc_mean['count_norm'] = cip_numb_conc_mean['unnorm']/(np.log(cip_numb_conc_mean['Bin endpoints (microns):']*1.e-6)-np.log(cip_numb_conc_mean['Bin startpoints (microns)']*1.e-6))
     #Checking for what happens when I keep the original normalization
