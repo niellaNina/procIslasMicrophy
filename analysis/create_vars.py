@@ -36,7 +36,7 @@ def add_alt_bins(ds, bin_width = 300):
 
 
 def lat_2band_select(lat_bands, ds):
-    """Function to greate masks for two latitude bands defined by the latitudes in lat_bands
+    """Function to create masks for two latitude bands defined by the latitudes in lat_bands
       Parameters
     ----------
     ds
@@ -57,25 +57,28 @@ def lat_2band_select(lat_bands, ds):
             - lat_bands: array of the latitudes used to define the two regions
 
     """
-    lat_min, lat_mid, lat_max = lat_bands # unpack lat selection
-    
+
+    lat_min = lat_bands[0] # unpack lat selection
+    lat_mid = lat_bands[1] # unpack lat selection
+    lat_max = lat_bands[2] # unpack lat selection
+
     # count number of values between different latitudes and add to dictionary
-    lat_values = ds['lat']  # Access the latitude coordinate
+    lat_values = ds['lat'].values  # Access the latitude coordinate
+    
     count_dict = {'count_south': ((lat_values >= lat_min) & (lat_values <= lat_mid)).sum().item(),
                   'count_north': ((lat_values >= lat_mid) & (lat_values <= lat_max)).sum().item(),
                  'lat_bands': lat_bands}
 
+    #return count_dict
     # Compute the boolean masks for latitude conditions
-    lat_mask_north = (ds['lat'] < lat_max) & (ds['lat'] >= lat_mid)
-    lat_mask_south = (ds['lat'] < lat_mid) & (ds['lat'] >= lat_min)
+    lat_mask_north = (ds['lat'].values < lat_max) & (ds['lat'].values >= lat_mid)
+    lat_mask_south = (ds['lat'].values < lat_mid) & (ds['lat'].values >= lat_min)
 
     # Example of filtering a dataset on masks
-    ds_filtered_north = ds.where(lat_mask_north, drop=True)
-    ds_filtered_south = ds.where(lat_mask_south, drop=True)
+    #ds_filtered_north = ds.where(lat_mask_north, drop=True)
+    #ds_filtered_south = ds.where(lat_mask_south, drop=True)
 
-    print(f'number of values in 2 bands defined by {lat_bands}:')
-    print(f'count_south: {len(ds_filtered_south.lat)},count_north: {len(ds_filtered_north.lat)}')
+    #print(f'number of values in 2 bands defined by {lat_bands}:')
+    #print(f'count_south: {len(ds_filtered_south.lat)},count_north: {len(ds_filtered_north.lat)}')
     
-    #return ds_filtered_north, ds_filtered_south, count_dict
-
     return lat_mask_north, lat_mask_south, count_dict
