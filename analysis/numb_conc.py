@@ -9,19 +9,13 @@ Scripts related to number concentration
 @author: ninalar
 """
 
-# imports from packages
-import pandas as pd
-import numpy as np
-import xarray as xr
-
-
-# imports from files
-from functions import *
-
-
 # --- Histogram for concentration per size bin
 # Need the number concentration data for both instruments (CIP and CDP) and their bin information:
 def hist_numb_conc(cdp_bulk_df, cdp_bins_df, cip_bulk_df, cip_bins_df):
+    import pandas as pd
+    import numpy as np
+    import xarray as xr
+
     # Prepare number concentration data for histogram
     
     # CIP data preparations ----
@@ -72,7 +66,7 @@ def hist_numb_conc(cdp_bulk_df, cdp_bins_df, cip_bulk_df, cip_bins_df):
     
     return(cdp_numb_conc_mean, cip_numb_conc_mean)
 
-def cip_mean_norm_Nt(ds: xr.Dataset)-> xr.DataArray:
+def cip_mean_norm_Nt(ds):
     """ Calculate mean log-normalized particle number per bin for CIP observations
 
     Parameters
