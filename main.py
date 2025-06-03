@@ -12,11 +12,11 @@ import matplotlib.pyplot as plt
 
 
 # imports from files
-import notebooks.functions as functions
+import analysis.functions as functions
 import read_cdp
 import read_cip_txt
 import read_lwc
-import notebooks.read_nav as read_nav
+import analysis.read_nav as read_nav
 import read_cip_nc
 import notebooks.plots as plots
 import numb_conc

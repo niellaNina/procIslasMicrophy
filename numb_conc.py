@@ -13,7 +13,7 @@ import numpy as np
 
 
 # imports from files
-import notebooks.functions as functions
+import analysis.functions as functions
 
 
 # --- Histogram for concentration per size bin

@@ -20,7 +20,7 @@ def standardize_cip_netcdf(cip_nc_file, nav_file, flight):
     import xarray as xr
     import numpy as np
     import re
-    import notebooks.functions as functions
+    import analysis.functions as functions
     
     cip_xds = xr.open_dataset(cip_nc_file) # returns an xarray dataset
     nav_xds = xr.open_dataset(nav_file) # returns an xarray dataset

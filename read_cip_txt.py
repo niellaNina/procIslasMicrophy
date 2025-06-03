@@ -30,7 +30,7 @@ def read_cip_txt():
     
     
     # functions used fron function.py file
-    from notebooks.functions import read_chunky_csv
+    from analysis.functions import read_chunky_csv
     # ---Data: CIP--- (ADJUSTED FOR MULTIPLE FILE READING)
     # Particle size distribution file created by SODA2
     # (if the PSD(ASCII)-option is chosen)

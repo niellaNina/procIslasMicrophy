@@ -58,8 +58,6 @@ def sel_incloud_values(ds, th_method = 'LWC_IWC_th'):
     ----------
     ds
         xarray dataset with all microphy values
-    save_path
-        str, path to where plots should be saved
     th_method
         str, which method should be used for determining incloud values
             - 'LWC_IWC_th' based on LWC and IWC (Default)
@@ -129,5 +127,6 @@ def sel_incloud_values(ds, th_method = 'LWC_IWC_th'):
     incloud_ds = ds.where(incloud_mask, drop = True)
 
     incloud_info = [th_method, long_txt]
+    
     return incloud_ds, incloud_info
 

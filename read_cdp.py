@@ -26,7 +26,7 @@ def read_cdp(nav_df):
     import os #get a list of all directories/files
     
     # functions used fron function.py file
-    from notebooks.functions import sec_since_midnigth, read_chunky_csv, resolve_date
+    from analysis.functions import sec_since_midnigth, read_chunky_csv, resolve_date
     
     # ----- Data ------
     # Read in the CDP files and the NAV files(for temperature and coordinates)

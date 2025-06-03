@@ -507,7 +507,7 @@ def rel_alt(row, cloudids, cloud_alt_dict):
 def prep_numb_conc(cdp_bulk_df, cdp_bins_df, cip_bulk_df, cip_bins_df):
     import pandas as pd
     import numpy as np
-    import notebooks.functions as functions
+    import analysis.functions as functions
     
     
     # Prepare number concentration data for histogram
