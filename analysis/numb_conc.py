@@ -140,17 +140,19 @@ def cdp_mean_norm_Nt(ds):
     
     # adjust the raw particle count by sample volume
     cdp_part_adj = (ds['CDP Bin Particle Count']/ds['SV'])
-    
+    print(cdp_part_adj.values)
     # summary statistics over time
     cdp_part_mean = cdp_part_adj.mean(dim='time')
     cdp_part_med = cdp_part_adj.median(dim='time')
-
+    print(cdp_part_mean.values)
     # log normalize the cdp particle counts to width (Size = upper limit of bin, Bin_min = lower limit of bin)
     # bin units are in micrometers and must be adjusted to m
-    log_norm_width = np.log(ds['Size']*1.e-6)-np.log(ds['Bin_min']*1.e-6)
+    log_norm_width = np.log(ds['Size'][0]*1.e-6)-np.log(ds['Bin_min'][0]*1.e-6)
+    print(log_norm_width.values)
     cdp_part_mean_norm = cdp_part_mean/log_norm_width  #normalize to bin width
     cdp_part_med_norm = cdp_part_med/log_norm_width  #normalize to bin width
 
+    print(cdp_part_mean_norm.values)
 
     
     return cdp_part_mean_norm.T, cdp_part_med_norm.T #return transposed to get the correct shape
