@@ -667,6 +667,22 @@ def cdp_df_to_netcdf(cdp_nav_df, cdp_list, meta_df, chan_list, bins_df, source_f
                            attrs  = {'longname':'Effective diameter','unit': 'um'}),
         'Applied PAS': xr.DataArray(data = cdp_nav_df['Applied PAS (m/s)'], dims = ['time'],coords = coords,attrs  = {'unit': 'm/s', 'description' : 'Probe Air Speed (PAS) used during data collection for adjusting variables'}),
         'TAS': xr.DataArray(data = cdp_nav_df['TAS (m/s)'], dims = ['time'],coords = coords,attrs  = {'unit': 'm/s', 'description':'True Air Speed (TAS) from navigational data'}),
+        'TAS correction factor': xr.DataArray(data = cdp_nav_df['TAS correction factor'], dims = ['time'], coords = coords,attrs={'name':'TAS correction factor',
+                                                                           'description': 'Correction factor for TAS depended variables. (aircraft TAS/PAS from probe calculations from Frey(2011)',
+                                                                           'parent variables':['Applied PAS','TAS'] }),
+        'Number Conc corr': xr.DataArray(data = cdp_nav_df['Number Conc corr (#/cm^3)'], dims = ['time'], coords = coords,attrs={'name':'Number concentration TAS corrected',
+                                                                'unit':'#/cm^3',
+                                                                'description': 'Number concentration corrected with the TAS correction factor',
+                                                               'parent variables':['Number Conc','TAS correction factor'] }),
+        'LWC corr': xr.DataArray(data = cdp_nav_df['LWC corr (g/m^3)'], dims = ['time'], coords = coords,attrs={'name':'Liquid water content TAS corrected',
+                                                                'unit':'g/m^3',
+                                                                'description': 'Liquid water content corrected with the TAS correction factor',
+                                                               'parent variables':['LWC','TAS correction factor']}),
+        'SV': xr.DataArray(data = cdp_nav_df['SV (m^3)'], dims = ['time'], coords = coords,attrs={'name':'Sample volume',
+                                    'unit':'m^3',
+                                    'description': 'Sample volume calculated (sample area SA * TAS redused * sample time (1 sek))',
+                                    'parent variables':['TAS reduce'],
+                                    'parent attributes': ['Sample Time (sec)','Sample Area (mm^2)'] }),                                                   
         # variables with dimesion 'bin'
         'Bin_min':xr.DataArray(data = bins_df['Min size'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'unit': 'um', 'description':'Lower bin size'}),
         'Size':xr.DataArray(data = bins_df['Size (microns)'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'unit': 'um', 'description':'Upper bin size'}),
@@ -680,31 +696,6 @@ def cdp_df_to_netcdf(cdp_nav_df, cdp_list, meta_df, chan_list, bins_df, source_f
                     'source files': source_files}
         )
 
-    # --- Data corrections
-
-    # -- CDP: adjust bulk parameters for TAS
-    # calculate TAS correction factor for each timestep
-    # (aircraft TAS - 13%)/PAS from probe calculations from Frey(2011)
-    ds['TAS reduce'] = 0.87*ds['TAS'] # reduce TAS due to airflow (-13%)
-    ds['TAS reduce'] = ds['TAS reduce'].assign_attrs({'name': 'TAS probe reduction',
-                                                       'unit': 'm/s', 
-                                                       'description': 'TAS - 13%, intermediate step of calculating probe reduction factor, from Frey 2011', 'parent variables': ['TAS']})
-    ds['TAS correction factor'] = ds['TAS reduce']/ds['Applied PAS']
-    ds['TAS correction factor'] = ds['TAS correction factor'].assign_attrs({'name':'TAS correction factor',
-                                                                           'description': 'Correction factor for TAS depended variables. (aircraft TAS - 13%)/PAS from probe calculations from Frey(2011)',
-                                                                           'parent variables':['Applied PAS','TAS reduce'] })
-    # adjust the Numb conc and the LWC parameters with the correction factor
-    # (MVD and ED is not dependent on TAS)
-    ds['Number Conc corr'] = ds['Number Conc']/ds['TAS correction factor']
-    ds['Number Conc corr']=ds['Number Conc corr'].assign_attrs({'name':'Number concentration TAS corrected',
-                                                                'unit':'#/cm^3',
-                                                                'description': 'Number concentration corrected with the TAS correction factor',
-                                                               'parent variables':['Number Conc','TAS correction factor'] })
-    ds['LWC corr'] = ds['LWC']/ds['TAS correction factor']
-    ds['LWC corr']=ds['LWC corr'].assign_attrs({'name':'Liquid water content TAS corrected',
-                                                                'unit':'g/m^3',
-                                                                'description': 'Liquid water content corrected with the TAS correction factor',
-                                                               'parent variables':['LWC','TAS correction factor'] })
     
     # UPDATING METADATA/ATTRIBUTES
     # Add PADS metadata (from the second item of cdp_list)
@@ -749,17 +740,6 @@ def cdp_df_to_netcdf(cdp_nav_df, cdp_list, meta_df, chan_list, bins_df, source_f
     for index, row in df.iterrows():
         var = row['Name'].split('(')[0].strip() # get variable name by removing unit
         ds[var] = ds[var].assign_attrs({'Housekeeping channel number': row['channel'], 'longname':row['Name'],'Equation scaling algorithm':row['Equation'], 'Coefficients':row['Coefficients']})
-
-    #calculate the sample volume (sample area SA * TAS redused * sample time (1 sek))
-    # sample area from meta information and given in mm^2 readjust to m by dividing with 10⁶
-    sa = float(ds.attrs['Sample Area (mm^2)']) /(1000*1000)
-    st = ds.attrs['Sample Time (sec)']
-    ds['SV'] = sa * ds['TAS reduce'] * st
-    ds['SV']=ds['SV'].assign_attrs({'name':'Sample volume',
-                                    'unit':'m^3',
-                                    'description': 'Sample volume calculated (sample area SA * TAS redused * sample time (1 sek))',
-                                    'parent variables':['TAS reduce'],
-                                    'parent attributes': ['Sample Time (sec)','Sample Area (mm^2)'] })
     
     # save as netcdf
     print(f'{path_store}CDP_updated_{ds.attrs['islasid']}.nc')
