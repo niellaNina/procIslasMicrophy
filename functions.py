@@ -667,6 +667,7 @@ def cdp_df_to_netcdf(cdp_nav_df, cdp_list, meta_df, chan_list, bins_df, source_f
                            attrs  = {'longname':'Effective diameter','unit': 'um'}),
         'Applied PAS': xr.DataArray(data = cdp_nav_df['Applied PAS (m/s)'], dims = ['time'],coords = coords,attrs  = {'unit': 'm/s', 'description' : 'Probe Air Speed (PAS) used during data collection for adjusting variables'}),
         'TAS': xr.DataArray(data = cdp_nav_df['TAS (m/s)'], dims = ['time'],coords = coords,attrs  = {'unit': 'm/s', 'description':'True Air Speed (TAS) from navigational data'}),
+        #----------- remove later
         'TAS correction factor': xr.DataArray(data = cdp_nav_df['TAS correction factor'], dims = ['time'], coords = coords,attrs={'name':'TAS correction factor',
                                                                            'description': 'Correction factor for TAS depended variables. (aircraft TAS/PAS from probe calculations from Frey(2011)',
                                                                            'parent variables':['Applied PAS','TAS'] }),
@@ -678,6 +679,7 @@ def cdp_df_to_netcdf(cdp_nav_df, cdp_list, meta_df, chan_list, bins_df, source_f
                                                                 'unit':'g/m^3',
                                                                 'description': 'Liquid water content corrected with the TAS correction factor',
                                                                'parent variables':['LWC','TAS correction factor']}),
+        #----------- remove
         'SV': xr.DataArray(data = cdp_nav_df['SV (m^3)'], dims = ['time'], coords = coords,attrs={'name':'Sample volume',
                                     'unit':'m^3',
                                     'description': 'Sample volume calculated (sample area SA * TAS redused * sample time (1 sek))',
