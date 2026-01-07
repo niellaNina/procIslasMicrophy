@@ -1,0 +1,8 @@
+# config.yaml
+data_dir: home/Documents/MC2/2022-islas/'
+save_dir: home/Documents/MC2/procislasMicrophy-1/Test'
+log_dir: ./logs
+
+# optional other settings
+sample_rate: 44100
+use_cache: true

@@ -25,10 +25,10 @@ def read_nav():
     
     # functions used fron function.py file
     from functions import sec_since_midnigth
-    from read_flight_report import read_flight_report, find_report_entries, read_flight_report_single
+    from postprocessing.read_flight_report import read_flight_report, find_report_entries, read_flight_report_single
         
     # Local disk path of data:
-    main_path = '../2022-islas/' # directory with flight data
+    main_path = 'home/Documents/MC2/2022-islas/' # directory with flight data
     nav_file_struct_tdyn = '/ISLAS_SAFIRE-ATR42_CORE_TDYN_1HZ_*_L1_V1.nc' # structure of nav TDYN file names
     nav_file_struct_nav = '/ISLAS_SAFIRE-ATR42_CORE_NAV_1HZ_*_L1_V1.nc' # structure of nav NAV file names
     drop_flights = ['as220005','as220006'] # flights to drop, (if not all are to be analysed 5 and 6 is in france)
@@ -234,3 +234,4 @@ def read_nav():
        
     return(islas_nav_df, stats_df, extra_info)
     
+
