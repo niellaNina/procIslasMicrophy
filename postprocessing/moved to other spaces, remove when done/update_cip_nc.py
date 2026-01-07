@@ -1,3 +1,5 @@
+# MOVED TO nc_utils
+
 def standardize_cip_netcdf(cip_nc_file, nav_tdyn_file,nav_nav_file, flight):
     """ Add NAV information to CIP nc file (coordinates, meteorological parameters)
 
