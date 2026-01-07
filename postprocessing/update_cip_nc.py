@@ -1,3 +1,103 @@
+def update_cip_nc():
+    """updates the CIP nc with dims and coords from nav file
+
+    Parameters
+    ----------
+    a : int
+        The first number.
+    b : int
+        The second number.
+
+    Returns
+    -------
+    int
+        The sum of the two numbers.
+    """
+    import xarray as xr # read netcdf-files
+    import glob # allows for wildcards in filemanagement
+    import os #get a list of all directories/files
+    import re #regex
+
+    from postprocessing import INPUT_DATA_PATH, SAVE_FILES_PATH
+    from postprocessing.utils.func_nc import nc_save_with_check
+    from update_cip_nc import standardize_cip_netcdf
+
+    # sample rate to process (current possibilities: 1,5,12 sek)
+    sample_rate = 5
+    # -- Paths to datafiles
+    # Local disk path to nav data:
+    nav_main_path = INPUT_DATA_PATH # directory with flight data
+    nav_file_struct_tdyn = '/*_TDYN_*.nc' # structure of nav TDYN file names
+    nav_file_struct_nav = '/*_NAV_*.nc' # structure of nav NAV file names
+    drop_flights = ['as220005','as220006'] # flights to drop, (if not all are to be analysed 5 and 6 is in france)
+        
+    # Local disk path to SODA processed CIP files
+    cip_main_path = f'/home/ninalar/Documents/MC2/Results_2022-islas/{sample_rate}sAveraging/'
+
+    cip_file_struct = '/*CIP.nc'
+
+    # Save file path
+    save_path = SAVE_FILES_PATH
+
+    # -- Get foldernames that are flights (valid in both nav_main_path and cip_main_part)    
+    # regex for only using folders that are flights
+    patt = re.compile(r"as2200\d{2}") # flights have the pattern as2200 + 2 digits
+        
+    flights = [
+        f for f in os.listdir(nav_main_path) 
+        if os.path.isdir(os.path.join(nav_main_path, f)) and patt.fullmatch(f)
+        ]
+        
+    # remove flights to drop using listcomprehension
+    flights = [i for i in flights if i not in drop_flights] # list of folders/flights
+
+    # safireid-islasid dictionary
+    safire_to_islas = {
+        'as220007':'IS22-02',
+        'as220008':['IS22-03','IS22-04'],
+        'as220009':'IS22-05',
+        'as220010':'IS22-06',
+        'as220011':'IS22-07',
+        'as220012':'IS22-08',
+        'as220013':'IS22-09',
+        'as220014':'IS22-10',
+        'as220015':'IS22-11'
+        }
+    # Process all flights in the folders
+    for flight in flights:
+        print(flight)
+        # ---- Get CDP and NAV data from flight
+        if flight == 'as220008':
+            nav_tdyn_file = glob.glob(nav_main_path + flight + nav_file_struct_tdyn) 
+            nav_nav_file = glob.glob(nav_main_path + flight + nav_file_struct_nav)
+            # flight with safireid as 220008 has two islasids and must be addressed separately:
+            for islasid in safire_to_islas['as220008']:
+                cip_file = glob.glob(cip_main_path + flight + f'/{islasid}' + cip_file_struct) 
+                print(f'Reading: {cip_file[0]}, {nav_nav_file[0]} and {nav_tdyn_file[0]}')
+                cip_updated_xds = standardize_cip_netcdf(cip_file[0], nav_tdyn_file[0],nav_nav_file[0], islasid)
+
+                # save to new netCDF
+                savefile = save_path + f'CIP_update_{sample_rate}s_{islasid}.nc'
+                nc_save_with_check(savefile, cip_updated_xds)
+
+                
+        else:
+            nav_tdyn_file = glob.glob(nav_main_path + flight + nav_file_struct_tdyn) 
+            nav_nav_file = glob.glob(nav_main_path + flight + nav_file_struct_nav)
+            cip_file = glob.glob(cip_main_path + flight + cip_file_struct) # returns a list, must access with file[0]
+
+            print(cip_main_path)
+            print(flight)
+
+            #cip_xds = xr.open_dataset(cip_file) # returns an xarray dataset
+            print(f'Reading: {cip_file[0]}, {nav_nav_file[0]} and {nav_tdyn_file[0]}')
+            islasid = safire_to_islas[flight]
+            cip_updated_xds = standardize_cip_netcdf(cip_file[0], nav_tdyn_file[0],nav_nav_file[0], islasid)
+
+            #Save to new netCDF
+            savefile = save_path + f'CIP_update_{sample_rate}s_{islasid}.nc'      
+            nc_save_with_check(savefile, cip_updated_xds)
+
 def standardize_cip_netcdf(cip_nc_file, nav_tdyn_file,nav_nav_file, flight):
     """ Add NAV information to CIP nc file (coordinates, meteorological parameters)
 
@@ -20,7 +120,7 @@ def standardize_cip_netcdf(cip_nc_file, nav_tdyn_file,nav_nav_file, flight):
     import xarray as xr
     import numpy as np
     import re
-    from func_nc import floor_to_sec_res
+    from postprocessing.utils.func_nc import floor_to_sec_res
     
     cip_xds = xr.open_dataset(cip_nc_file) # returns an xarray dataset
     nav_tdyn_xds = xr.open_dataset(nav_tdyn_file) # returns an xarray dataset
@@ -40,7 +140,7 @@ def standardize_cip_netcdf(cip_nc_file, nav_tdyn_file,nav_nav_file, flight):
     
 
     # -- UPDATE COORDINATES based on NAV file
-    datetimes = cip_xds.time.values #base_time + times.astype('timedelta64[s]')                   #transform from seconds from midnight to datetimeobject     
+    datetimes = cip_xds.time.values                    #transform from seconds from midnight to datetimeobject     
     
     # select the NAV data from these times (for both nav files)
     sel_data_tdyn = nav_tdyn_xds.sel(time=datetimes, method = "nearest")           # "nearest" due to diffs in decimalseconds
@@ -142,3 +242,6 @@ def standardize_cip_netcdf(cip_nc_file, nav_tdyn_file,nav_nav_file, flight):
     nav_nav_xds.close()
     
     return cip_updated_xds
+
+if __name__ == "__main__":
+    update_cip_nc()

@@ -1,0 +1,18 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../.."
+		},
+		{
+			"path": "../../ACDD"
+		},
+		{
+			"name": "Add_metadataACDD",
+			"path": "../../ACDD/Add_metadataACDD"
+		}
+	],
+	"settings": {}
+}
