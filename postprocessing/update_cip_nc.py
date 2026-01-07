@@ -17,16 +17,18 @@ def update_cip_nc():
     import glob # allows for wildcards in filemanagement
     import os #get a list of all directories/files
     import re #regex
+    from pathlib import Path
+    from . import config
 
-    from postprocessing import INPUT_DATA_PATH, SAVE_FILES_PATH
-    from postprocessing.utils.func_nc import nc_save_with_check
+
+    from utils.func_nc import nc_save_with_check
     from update_cip_nc import standardize_cip_netcdf
 
     # sample rate to process (current possibilities: 1,5,12 sek)
     sample_rate = 5
     # -- Paths to datafiles
     # Local disk path to nav data:
-    nav_main_path = INPUT_DATA_PATH # directory with flight data
+    nav_main_path = config.DATA_DIR # directory with flight data
     nav_file_struct_tdyn = '/*_TDYN_*.nc' # structure of nav TDYN file names
     nav_file_struct_nav = '/*_NAV_*.nc' # structure of nav NAV file names
     drop_flights = ['as220005','as220006'] # flights to drop, (if not all are to be analysed 5 and 6 is in france)

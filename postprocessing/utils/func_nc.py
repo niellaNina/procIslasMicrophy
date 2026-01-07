@@ -248,7 +248,7 @@ def cdp_df_to_netcdf(cdp_nav_df, cdp_list, meta_df, chan_list, bins_df, source_f
         ds[var] = ds[var].assign_attrs({'Housekeeping channel number': row['channel'], 'longname':row['Name'],'Equation scaling algorithm':row['Equation'], 'Coefficients':row['Coefficients']})
     
     # save as netcdf
-    print(f'{path_store}CDP_updated_{ds.attrs['islasid']}.nc')
-    ds.to_netcdf(f'{path_store}CDP_updated_{ds.attrs['islasid']}.nc','w')
+    print(f'{path_store}CDP_updated_{ds.attrs["islasid"]}.nc')
+    ds.to_netcdf(f'{path_store}CDP_updated_{ds.attrs["islasid"]}.nc','w')
     
     return ds
