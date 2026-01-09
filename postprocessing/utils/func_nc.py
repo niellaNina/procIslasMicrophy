@@ -10,15 +10,23 @@ Scripts related to handling netcdfs in the islas processing
 def floor_to_sec_res(ds, time_dim):
     """ Function to floor the time to whole seconds
 
-    Args:
-        ds: xarray dataset with time dimention variable defined by "time_dim"
-        time_dim: name of xarray variable containing time dimention in seconds.
+    This function relies on the "pandas" package
+
+    Parameters
+    ---------- 
+        ds: Xarray.DataSet
+            xarray dataset with time dimention variable defined by "time_dim"
+        time_dim: str
+            name of xarray variable containing time dimention in seconds.
     
-    Returns:
-        the ds with the time_dim floored to closest whole seconds
+    Returns
+    ----------
+        ds: Xarray.DataSet
+            the original ds with the time_dim floored to closest whole seconds
     """
     
     import pandas as pd
+
     # Convert to pandas datetime index
     datetime_index = pd.to_datetime(ds[time_dim].values) # turn into datetime index
     floored_time = datetime_index.floor('s') # floor on seconds
@@ -41,11 +49,23 @@ def sec_since_midnigth(dt_obj):
 
 
 def resolve_date(year, day_num):
-    # Resolving date from day number (day_num) and year
-    # Input: 
-    #       day_num: number of days since 01.01
-    #       year: Year in YYYY format
-    # Output: date in format YYYY-MM-DD
+    """Resolving date from day number (day_num) and year 
+
+    This function relies on the 'datetime' and 'dateutil' packages
+
+    Parameters
+    ----------
+    day_num: int
+        number of days since 01.01
+    year: int
+        Year in YYYY format
+
+    Returns
+    ----------
+    res:
+        resulting date in format YYYY-MM-DD
+    """
+  
     from datetime import timedelta
     from dateutil import parser
  
@@ -61,39 +81,30 @@ def resolve_date(year, day_num):
  
     return res
 
-def read_chunky_csv(textfile, sep=[]):
+def find_unique_listkey(dict, sub_key):
+    """Count number of unique keys in a dictionary 
+
+    Parameters
+    ----------
+    dict: dict
+        dictionary containing keys
+    sub_key: str
+        
+
+    Returns
+    ----------
+    set(values): set
+        the unique values found
     """
-    Splits information of csv files with different "chucks" of data into a list of lists
-    Each chunck gets its own list. The number of lines for each chunck does not matter. 
-    # requires: import csv
-    # input: path to csv-file, separator to split on: default empty list[]
-    # returns: list of lists
-    """
-    import csv
+    values = []
     
-    # read in file as a list of lines
-    with open(textfile, encoding='ISO-8859-1') as infile:
-        data_list = list(csv.reader(infile))  
-
-    # The datafiles are composed of 5 different "chunks" of information separated by an empty line: 
-    # 0: Processing information, 1: Bin information, 2: Notes, 3: Variable information, 5: Data
-    # The number of lines in each chunck varies and depends on the preprocessing, number if image files etc.
-    # Separate the chunks by splitting on empty lines []:
-    sublists = []
-    current_sublist = []
-
-    for item in data_list:
-        if item == sep:
-            if current_sublist:
-                sublists.append(current_sublist)
-                current_sublist = []
-        else:
-            current_sublist.append(item)
-
-    if current_sublist:
-        sublists.append(current_sublist)
+    for key in dict:
+        if sub_key in dict[key].keys():
+          values.append(dict[key][sub_key][0])
     
-    return sublists
+    # Return all unique values
+    return set(values)
+
 
 def cdp_df_to_netcdf(cdp_nav_df, cdp_list, meta_df, chan_list, bins_df, source_files, path_store):
     # function to turn the results from the function read_cdp into a netcdf file

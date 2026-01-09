@@ -10,7 +10,7 @@ Created on Wed Feb 28 11:09:21 2024
 # Read Nav files, extract variables, extract stats information from flights
 # Also updates nomenclature on flights (adds ISLAS flightid in addtion to safireid)
 # WARNING: this code has some hardcodet paths to fix the 8th flight (two islas flightids in one safireid 
-def read_nav():
+def read_nav(flights):
           
     import xarray as xr # read netcdf-files
     import numpy as np
@@ -23,22 +23,14 @@ def read_nav():
     
     warnings.filterwarnings('ignore', category=DeprecationWarning) # stop the deprecation warnigns from np time management
     
-    from postprocessing.utils.func_nc import sec_since_midnigth
+    from utils.func_nc import sec_since_midnigth
     from read_flight_report import read_flight_report, find_report_entries, read_flight_report_single
         
     # Local disk path of data:
     main_path = '../2022-islas/' # directory with flight data
     nav_file_struct_tdyn = '/ISLAS_SAFIRE-ATR42_CORE_TDYN_1HZ_*_L1_V1.nc' # structure of nav TDYN file names
     nav_file_struct_nav = '/ISLAS_SAFIRE-ATR42_CORE_NAV_1HZ_*_L1_V1.nc' # structure of nav NAV file names
-    drop_flights = ['as220005','as220006'] # flights to drop, (if not all are to be analysed 5 and 6 is in france)
-    
-     
-    flights = [
-         f for f in os.listdir(main_path) if os.path.isdir(os.path.join(main_path, f))
-    ]
-     
-    # remove flights to drop using listcomprehension
-    flights = [i for i in flights if i not in drop_flights]
+   
     
     islas_nav_df = []  # empty list for appending all data to one structure
     islas_stats_dict = {}  #empty dictionary for collecting flight stats information

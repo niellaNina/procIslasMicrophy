@@ -39,11 +39,22 @@ def nc_save_with_check(savefile ,xds):
 
 def read_chunky_csv(textfile, sep=[]):
     """
-    Splits information of csv files with different "chucks" of data into a list of lists
+    Function that splits information of csv files with different "chucks" of data into a list of lists
     Each chunck gets its own list. The number of lines for each chunck does not matter. 
-    # requires: import csv
-    # input: path to csv-file, separator to split on: default empty list[]
-    # returns: list of lists
+
+    This function relies on the 'csv' package
+
+    Parameters
+    ----------
+    textfile: str
+        path to csv-file
+    sep: str
+        separator to split on: default empty list[]
+
+    Returns
+    ----------
+    sublists: list of lists
+        List of lists where each list is one "chunck" of the file
     """
     import csv
     
@@ -51,7 +62,7 @@ def read_chunky_csv(textfile, sep=[]):
     with open(textfile, encoding='ISO-8859-1') as infile:
         data_list = list(csv.reader(infile))  
 
-    # The datafiles are composed of 5 different "chunks" of information separated by an empty line: 
+    # The cdp datafiles are composed of 5 different "chunks" of information separated by an empty line: 
     # 0: Processing information, 1: Bin information, 2: Notes, 3: Variable information, 5: Data
     # The number of lines in each chunck varies and depends on the preprocessing, number if image files etc.
     # Separate the chunks by splitting on empty lines []:
@@ -203,6 +214,81 @@ def cdp_df_to_netcdf(cdp_nav_df, cdp_list, meta_df, chan_list, bins_df, source_f
     
     return ds
 
+# NOTE: This is the new, simplified version that only adds 
+def update_cip_nc(cip_nc_file, nav_nav_file, flight):
+    """ Add coordinates(from nav) and metadata to CIP nc file
+
+    This function relies on the packages 'xarray','numpy' and 're' for datamanagement and calculations,
+    the date function from datetime for date management and the local function floor_to_sec_res from utils_func.nc.
+
+    Parameters
+    ----------
+    cip_nc_file
+        CIP NetCDF file from flight
+    nav_file
+        Navigation file from flight
+    flight
+        islasid of flight
+
+    Returns
+    -------
+    cip_updated_xds
+        xarray dataset from the CIP file updated with coordinates from the core nav file
+    """
+    import xarray as xr # read netcdf-files
+    import numpy as np
+    import re #regex
+    from datetime import date
+    from utils.func_nc import floor_to_sec_res
+    from utils.meta_utils import attrs_from_list, var_attrs_from_list
+    
+    cip_xds = xr.open_dataset(cip_nc_file) # the cip xarray (from soda)
+    nav_nav_xds = xr.open_dataset(nav_nav_file) # the nav file xarray
+
+    # CIP preparations: fix time dimension cip_xds
+    cip_xds = cip_xds.rename_vars({'elapsed_time':'time'}) # elapsed time holds the correct time to use, change name to time for simplicity
+    cip_xds = cip_xds.set_coords('time') # set as coordinate 
+    cip_xds = cip_xds.swap_dims({'Time': 'time'}) # set as main dimension
+    cip_xds = floor_to_sec_res(cip_xds,'time') # floor the times to sec for easier joining
+
+    # NAV preparations: drop duplicate time steps (in nav)
+    index = np.unique(nav_nav_xds.time, return_index = True)[1]
+    nav_nav_xds = nav_nav_xds.isel(time=index)
+    nav_nav_xds = floor_to_sec_res(nav_nav_xds,'time') # floor the times to sec for easier joining
+    
+
+    # -- UPDATE COORDINATES based on NAV file
+    datetimes = cip_xds.time.values                         
+    sel_data_nav = nav_nav_xds.sel(time=datetimes, method = "nearest") # select the NAV data from times in CIP
+    cip_updated_xds = cip_xds.assign_coords(sel_data_nav.coords)  # Add NAV coordinates to the CIP xarray
+    
+    # -- CIP variable updates and calculations
+    
+    # Variable renaming for easier access in analysis
+    cip_updated_xds = cip_updated_xds.rename({'LWC': 'LWC_cip'}) #change name of LWC (to avoid confusion with cdp later)
+    cip_updated_xds = cip_updated_xds.rename({'LATITUDE': 'lat','LONGITUDE': 'lon', 'ALTITUDE':'alt'})
+
+    # Calculate SV
+    # Sample Volume = Sample Area ('SA') * TAS * sample time (.attrs['RATE'])
+    cip_updated_xds['SV_CIP'] = cip_updated_xds['SA']*cip_updated_xds['TAS']*cip_updated_xds.attrs['RATE']
+    cip_updated_xds['SV_CIP'].attrs['longname']='Sample volume'
+    cip_updated_xds['SV_CIP'].attrs['unit']='m3'
+    cip_updated_xds['SV_CIP'].attrs['description']='Sample volume per size bin'
+    cip_updated_xds['SV_CIP'].attrs['calculated from']=['SA', 'TAS', 'attrs:RATE']
+
+    # -- Update metadata
+    meta_inst = {'instrument': 'CIP' #AC
+                 } 
+
+    # Variable dependent metadata
+    cip_updated_xds = var_attrs_from_list(cip_updated_xds, meta_inst )
+
+    cip_xds.close()
+    nav_nav_xds.close()
+    
+    return cip_updated_xds
+
+#Old version
 def standardize_cip_netcdf(cip_nc_file, nav_tdyn_file,nav_nav_file, flight):
     """ Add NAV information to CIP nc file (coordinates, meteorological parameters)
 
