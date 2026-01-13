@@ -20,7 +20,7 @@ def read_flight_report():
     import re #regex
 
     # Local functions
-    from analysis.functions import read_chunky_csv
+    from utils.nc_utils import read_chunky_csv
     
     # --- Get flights and flightreports 
     main_path = '../2022-islas/' # path to 
@@ -70,7 +70,7 @@ def read_flight_report():
 
 def read_flight_report_single(file):
     import pandas as pd
-    from analysis.functions import read_chunky_csv
+    from utils.nc_utils import read_chunky_csv
     # reading in flight report as chunky csv    
     fr_list = read_chunky_csv(file)
     # store flightreport entries as dataframe
