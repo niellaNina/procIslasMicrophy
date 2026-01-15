@@ -36,6 +36,38 @@ def nc_save_with_check(savefile ,xds):
         
     return
 
+def binned_cdp_to_xds(bins_df, cdp_bin_df):
+    """
+    Function to turn the binned CDP variables (counts) saved in pandas dataframes into an xarray structure 
+
+    This function relies on the 'xarrat' package
+
+    Parameters
+    ----------
+    bins_df: pandas Dataframe
+        dataframe with bin information: 'Bin_min', 'Size', 'Threshold', 'Width' per CDP_bin 1-30
+    cdp_bin_df: pandas Dataframe
+        dataframe containing the particle counts per size bin, index: 'time'
+
+    Returns
+    ----------
+    bins_xds: Xarray.Dataset
+        xarray with dimenstions 'time' and 'CDP_bin'
+    """
+    import xarray as xr
+    
+    # Create xarray of bins_df and add to cdp_xds
+    bins_xds = xr.Dataset({                                                 
+                'Bin_min':xr.DataArray(data = bins_df['Min size'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'unit': 'um', 'description':'Lower bin size'}),
+                'Size':xr.DataArray(data = bins_df['Size (microns)'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'unit': 'um', 'description':'Upper bin size'}),
+                'Threshold':xr.DataArray(data = bins_df['Threshold'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'description':'Upper ADC Threshold'}),
+                'Width':xr.DataArray(data = bins_df['Width'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'description':'Bin width'}),
+                'CDP Bin Particle Count': xr.DataArray(data = cdp_bin_df,
+                                                dims = ['time','CDP_Bin'],
+                                                coords = {'CDP_Bin': bins_df.index},
+                                                attrs = {'description': 'Number of particles detected in each of the CDP sizing bins during the current sampling interval.'})   
+                })
+    return bins_xds
 
 def read_chunky_csv(textfile, sep=[]):
     """
