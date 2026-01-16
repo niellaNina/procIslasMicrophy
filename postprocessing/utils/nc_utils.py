@@ -36,6 +36,197 @@ def nc_save_with_check(savefile ,xds):
         
     return
 
+def cdp_to_df(filelist, flight):
+    """
+    Function to turn the CDP csv-files into pandas dataframes ready to use in NetCDF creation 
+
+    This function relies on the 'pandas' package, and needs to import the 'read_chunky_csv' function from nc_utils and the 'resolve_date' from func_nc
+
+    Parameters
+    ----------
+    filelist: list
+        list of filenames to extract cdp information from
+    flight: str
+        Flightid the data are supposed to come from
+
+    Returns
+    ----------
+    total_cdp_df: pd.DataFrame
+        dataframe containing the CDP variables
+    filenames: list
+        list of filenames uest to make the df
+    meta_df: pd.DataFrame
+        dataframe containing metadata for the instruments
+    chan_list: list
+        List containing channel setup for the instrument
+    pads_info_df: pd.DataFrame
+        dataframe containing informaiton about pads settings
+    bins_df: pd.DataFrame
+        dataframe with settings and limits for the cdp bins
+    """
+    import pandas as pd
+    from utils.nc_utils import read_chunky_csv
+    from utils.func_nc import resolve_date
+
+    # initiation lists and dicts
+    total_cdp_df = []  # empty list for appending all data to one structure
+    #meta_dict = {}
+    filenames = []
+
+    #in each directory there is a CDP-csv file
+    for i,file in enumerate(filelist):
+        print('Reading: ' + file) 
+        # reading in csv data without metadata, csv file structured with empty line between different chuncks   
+        cdp_list = read_chunky_csv(file)
+        
+        # --- Get data information from 2th chunk. Turn this into a dataframe:
+        data = cdp_list[2]
+        data.pop(0) # remove separator line
+        header = data.pop(0) #get header
+        cdp_df = pd.DataFrame(data) # turn into dataframe
+        cdp_df = cdp_df.astype(float) # change from string to float
+        cdp_df.columns = header #add header information to df
+        cdp_df["safireid"]=flight # add flight information
+    
+        # transform UTC Seconds to datetime, add to time
+        date_temp= resolve_date(cdp_df['Year'], cdp_df['Day of Year'])
+        sec_temp = cdp_df['UTC Seconds'].apply(lambda x: pd.to_timedelta(x, unit='s')) #turn utc seconds since midnight into datetime object
+        cdp_df['time'] = date_temp + sec_temp # add date to the seconds since midnight
+        
+    
+        #---- Get metadata from 0th item in cdp_list
+        meta = cdp_list[0]
+        # flatten the list
+        cdp_meta = [item[0] if len(item) == 1 else ' '.join(item) for item in meta]
+        cdp_meta.pop(0) # remove first item of list [Instrument2]
+        
+        # split list based on conditions (including "Channel" or "<30>" and the rest)
+        sub_ch = 'Channels'
+        sub_bin = '<30>'
+            
+        chan_list = [i for i in cdp_meta if sub_ch in i] # list of all items with 'Channel'
+        bin_list = [i for i in cdp_meta if sub_bin in i] # list of all items with '<30>'
+        
+        meta_bin_list = list(set(cdp_meta).difference(chan_list)) # remove chan_list from cdp_list
+        meta_list = list(set(meta_bin_list).difference(bin_list)) # remove bin_list from the resulting list
+        
+        # Turn metadata list into dataframe, clean up and separate variable from value 
+        meta_df=pd.DataFrame(meta_list, columns=['Metadata'])
+        meta_df['Value'] = meta_df['Metadata'].apply(lambda x: x.split('=')[1].strip())
+        meta_df['Metadata'] = meta_df['Metadata'].apply(lambda x: x.split('=')[0].strip())
+            
+        # Turn bin_list (list of strings) into dataframe of bin information
+        # Take entry that includes size or threes, remove the parts of the string that is not values, turn into list
+        size_list = [i for i in bin_list if 'Size' in i][0].replace("Sizes=<30>","",1).split(" ")
+        thr_list = [i for i in bin_list if 'Thres' in i][0].replace("Thresholds=<30>","",1).split(" ")
+        
+        # Make list of lower edges
+        # lower edge of the first bin is in the metadata, the rest is the same as the size list -last entry
+        bin1min = meta_df.loc[meta_df['Metadata']=='Bin 1 Lower Thresh.','Value'].iloc[0] # get the value of the lower bin size treshold
+        size_min_list = list(bin1min)+ size_list # add the bin1min to the top of the list
+        size_min_list.pop() # remove the last item of the list
+        # generate bin number based on lenght of size_list and thr_list
+        if len(size_list)==len(thr_list):
+            bin_list = list(range(1,len(size_list)+1, 1))
+        else:
+            print('Warning: size_list and thr_list not of equal lenght')
+        
+        # turn the three lists into dataframe of integers
+        bins_df = pd.DataFrame({'CDP_Bin': bin_list, 'Size (microns)': size_list,'Min size': size_min_list, 'Threshold': thr_list}).astype('int64').set_index('CDP_Bin')
+        # calculate the bind width for each bin (for later normalization of values)
+        bins_df['Width']=bins_df['Size (microns)'] - bins_df['Min size']
+        
+        # --- get pads information from 1st item in cdp_list
+        pads_info_df = pd.DataFrame(cdp_list[1], columns=['Info'])
+        # clean up and separate variable from unit 
+        pads_info_df['Value'] = pads_info_df['Info'].apply(lambda x: x.split('=')[1].strip())
+        pads_info_df['Info'] = pads_info_df['Info'].apply(lambda x: x.split('=')[0].strip())
+
+
+        #extract only filename from file and add to list of filenames
+        filename = file.split('/')[-1]
+        filenames.append(filename)
+        #flight_dict[i]={'filename':filename,'islasids':flight, 'pads info': cdp_list[1], 'instrument info': meta_df, 'channel info':chan_list}
+        total_cdp_df.append(cdp_df) # append list with the new dataframe
+
+
+    #meta_dict[flight] = {'filenames':filenames,'islasid':flight, 'pads info': cdp_list[1], 'instrument info': meta_df, 'channel info':chan_list} #TODO: check if cdp_list, meta_df and chan_list actually is the same between all files
+
+    # Join the results from all the files into one df
+    total_cdp_df = pd.concat(total_cdp_df)
+
+    # remove empthy columns ('Spare #')
+    total_cdp_df = total_cdp_df.loc[:,~total_cdp_df.columns.str.startswith('Spare')]
+
+    # check that only one safireid and that it is equal to the given one
+    test_ids = total_cdp_df['safireid'].unique()
+
+    if len(test_ids) == 1:
+        #check that only one flight id is given
+        if test_ids == flight:
+            #test that it is equal to the one chosen
+            #if everything ok drop safireid from dataframe
+            total_cdp_df = total_cdp_df.drop('safireid',axis=1)
+    else:
+        print('more than one safireid in dataframe')
+
+    return total_cdp_df, filenames, meta_df, chan_list, pads_info_df, bins_df
+
+def add_cdp_df_to_xds(xds, df, meta_df, pads_df):
+    """
+    Function to add CDP dfs to existing xds inpreparation for NetCDF 
+
+    This function relies on the 'xarray' and 'pandas' package
+
+    Parameters
+    ----------
+    xds: xarray DataSet
+        xarray with coordinates and temperature from the related nav file
+    df: pandas Dataframe
+        dataframe containing the observational variables from the cpd
+    meta_df: pandas Dataframe
+        dataframe containing metadata for instruments
+    pads_df: pandas Dataframe
+        dataframe containing metadata for pads setup
+
+    Returns
+    ----------
+    cdp_xds: Xarray.Dataset
+        xarray updated with the variables from df
+    """
+    import xarray as xr
+    import pandas as pd
+    
+    # Update index and remove duplicates from dataframe
+    df['time']=pd.to_datetime(df['time'])
+    df = df.set_index('time')
+    df = df[~df.index.duplicated(keep='first')] #remove any duplicates in the dataframe
+
+    ds_from_df = xr.Dataset.from_dataframe(df) # create xr.dataset from the original df
+
+    # set joint metadata for variables
+    for var_name, variable in ds_from_df.data_vars.items():
+        ds_from_df[var_name].attrs['source'] = 'CDP' # update data variables
+
+    # reindex time to match the other xr (with tolerance of 1 sek)
+    tol = pd.Timedelta('1s')
+    ds_from_df_nearest = ds_from_df.reindex(time=xds['time'],method='nearest',tolerance=tol)
+
+    # Selecting only the times from the nav where the cdp has values
+    mask = ds_from_df_nearest.to_array().notnull().any(dim='variable')
+    lim_xds = xds.isel(time=mask.values)
+
+    cdp_xds = lim_xds.merge(ds_from_df_nearest.isel(time=mask.values))
+
+    # add metadata as global attributes to the xds
+    for index, row in meta_df.iterrows():
+        cdp_xds.attrs[row['Metadata']]=row['Value']
+
+    for index, row in pads_df.iterrows():
+        cdp_xds.attrs[row['Info']]=row['Value'] 
+
+    return cdp_xds
+
 def binned_cdp_to_xds(bins_df, cdp_bin_df):
     """
     Function to turn the binned CDP variables (counts) saved in pandas dataframes into an xarray structure 
