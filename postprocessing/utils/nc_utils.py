@@ -150,13 +150,20 @@ def cdp_to_df(filelist, flight):
         total_cdp_df.append(cdp_df) # append list with the new dataframe
 
 
-    #meta_dict[flight] = {'filenames':filenames,'islasid':flight, 'pads info': cdp_list[1], 'instrument info': meta_df, 'channel info':chan_list} #TODO: check if cdp_list, meta_df and chan_list actually is the same between all files
-
     # Join the results from all the files into one df
     total_cdp_df = pd.concat(total_cdp_df)
 
     # remove empthy columns ('Spare #')
     total_cdp_df = total_cdp_df.loc[:,~total_cdp_df.columns.str.startswith('Spare')]
+
+     # Update index and remove duplicates from dataframe
+    total_cdp_df['time']=pd.to_datetime(total_cdp_df['time'])
+    total_cdp_df['time']=total_cdp_df['time'].dt.floor('s') # floor to second for easier handling
+    total_cdp_df = total_cdp_df.set_index('time')
+    
+    #remove any duplicates in the dataframe
+    total_cdp_df = total_cdp_df[~total_cdp_df.index.duplicated(keep='first')]
+
 
     # check that only one safireid and that it is equal to the given one
     test_ids = total_cdp_df['safireid'].unique()
@@ -176,7 +183,7 @@ def add_cdp_df_to_xds(xds, df, meta_df, pads_df):
     """
     Function to add CDP dfs to existing xds inpreparation for NetCDF 
 
-    This function relies on the 'xarray' and 'pandas' package
+    This function relies on the 'xarray' and 're' package
 
     Parameters
     ----------
@@ -195,12 +202,7 @@ def add_cdp_df_to_xds(xds, df, meta_df, pads_df):
         xarray updated with the variables from df
     """
     import xarray as xr
-    import pandas as pd
-    
-    # Update index and remove duplicates from dataframe
-    df['time']=pd.to_datetime(df['time'])
-    df = df.set_index('time')
-    df = df[~df.index.duplicated(keep='first')] #remove any duplicates in the dataframe
+    import re
 
     ds_from_df = xr.Dataset.from_dataframe(df) # create xr.dataset from the original df
 
@@ -208,15 +210,8 @@ def add_cdp_df_to_xds(xds, df, meta_df, pads_df):
     for var_name, variable in ds_from_df.data_vars.items():
         ds_from_df[var_name].attrs['source'] = 'CDP' # update data variables
 
-    # reindex time to match the other xr (with tolerance of 1 sek)
-    tol = pd.Timedelta('1s')
-    ds_from_df_nearest = ds_from_df.reindex(time=xds['time'],method='nearest',tolerance=tol)
-
     # Selecting only the times from the nav where the cdp has values
-    mask = ds_from_df_nearest.to_array().notnull().any(dim='variable')
-    lim_xds = xds.isel(time=mask.values)
-
-    cdp_xds = lim_xds.merge(ds_from_df_nearest.isel(time=mask.values))
+    cdp_xds = xr.merge([ds_from_df,xds], join='inner')
 
     # add metadata as global attributes to the xds
     for index, row in meta_df.iterrows():
@@ -224,6 +219,21 @@ def add_cdp_df_to_xds(xds, df, meta_df, pads_df):
 
     for index, row in pads_df.iterrows():
         cdp_xds.attrs[row['Info']]=row['Value'] 
+
+    #-- Update metadata
+    # Update metadata: units from units in name
+    # get list of data variable names
+    var_list = list(cdp_xds.data_vars)
+
+    for var in var_list:
+        unit = var[var.find("(")+1:var.find(")")]
+        if var[0:-1]!=unit:
+            cdp_xds[var].attrs['units']= unit
+            no_parentheses = re.match(r'[^())]*',var)
+            cdp_xds[var].attrs['long_name'] = no_parentheses.group(0).strip() # longname is name without unit
+            # rename vars to name without unit
+            cdp_xds = cdp_xds.rename_vars({var:no_parentheses.group(0)})
+
 
     return cdp_xds
 
@@ -255,7 +265,7 @@ def binned_cdp_to_xds(bins_df, cdp_bin_df):
                 'Width':xr.DataArray(data = bins_df['Width'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'description':'Bin width'}),
                 'CDP Bin Particle Count': xr.DataArray(data = cdp_bin_df,
                                                 dims = ['time','CDP_Bin'],
-                                                coords = {'CDP_Bin': bins_df.index},
+                                                coords = {'CDP_Bin': bins_df.index, 'time': cdp_bin_df.index},
                                                 attrs = {'description': 'Number of particles detected in each of the CDP sizing bins during the current sampling interval.'})   
                 })
     return bins_xds
