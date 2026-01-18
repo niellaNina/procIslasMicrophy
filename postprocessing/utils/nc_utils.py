@@ -211,7 +211,7 @@ def add_cdp_df_to_xds(xds, df, meta_df, pads_df):
         ds_from_df[var_name].attrs['source'] = 'CDP' # update data variables
 
     # Selecting only the times from the nav where the cdp has values
-    cdp_xds = xr.merge([ds_from_df,xds], join='inner')
+    cdp_xds = xr.merge([ds_from_df,xds], join='inner', combine_attrs='no_conflicts')
 
     # add metadata as global attributes to the xds
     for index, row in meta_df.iterrows():
@@ -259,15 +259,20 @@ def binned_cdp_to_xds(bins_df, cdp_bin_df):
     
     # Create xarray of bins_df and add to cdp_xds
     bins_xds = xr.Dataset({                                                 
-                'Bin_min':xr.DataArray(data = bins_df['Min size'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'unit': 'um', 'description':'Lower bin size'}),
-                'Size':xr.DataArray(data = bins_df['Size (microns)'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'unit': 'um', 'description':'Upper bin size'}),
-                'Threshold':xr.DataArray(data = bins_df['Threshold'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'description':'Upper ADC Threshold'}),
-                'Width':xr.DataArray(data = bins_df['Width'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'description':'Bin width'}),
+                'Bin_min':xr.DataArray(data = bins_df['Min size'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'unit': 'um', 'description':'Lower bin size', 'source':'CDP'}),
+                'Size':xr.DataArray(data = bins_df['Size (microns)'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'unit': 'um', 'description':'Upper bin size','source':'CDP'}),
+                'Threshold':xr.DataArray(data = bins_df['Threshold'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'description':'Upper ADC Threshold','source':'CDP'}),
+                'Width':xr.DataArray(data = bins_df['Width'], dims = ['CDP_Bin'], coords = {'CDP_Bin': bins_df.index},attrs = {'description':'Bin width','source':'CDP'}),
                 'CDP Bin Particle Count': xr.DataArray(data = cdp_bin_df,
                                                 dims = ['time','CDP_Bin'],
                                                 coords = {'CDP_Bin': bins_df.index, 'time': cdp_bin_df.index},
-                                                attrs = {'description': 'Number of particles detected in each of the CDP sizing bins during the current sampling interval.'})   
+                                                attrs = {'description': 'Number of particles detected in each of the CDP sizing bins during the current sampling interval.','source':'CDP'})   
                 })
+    
+    # update metadata for CDP_Bin
+    bins_xds['CDP_Bin'] = bins_xds['CDP_Bin'].assign_attrs({'long_name':'CDP_Bin',
+                                                           'source':'CDP',
+                                                           'description': 'Bin number'})
     return bins_xds
 
 def read_chunky_csv(textfile, sep=[]):
