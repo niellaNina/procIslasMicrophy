@@ -232,7 +232,8 @@ def add_cdp_df_to_xds(xds, df, meta_df, pads_df):
             no_parentheses = re.match(r'[^())]*',var)
             cdp_xds[var].attrs['long_name'] = no_parentheses.group(0).strip() # longname is name without unit
             # rename vars to name without unit
-            cdp_xds = cdp_xds.rename_vars({var:no_parentheses.group(0)})
+            name = no_parentheses.group(0).replace('+', "") # remove + in name
+            cdp_xds = cdp_xds.rename_vars({var:name.strip()})
 
 
     return cdp_xds
