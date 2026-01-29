@@ -42,19 +42,19 @@ def create_derived_vars(xds):
     xds['Number Conc per bin'] = xds['Number Conc per bin'].assign_attrs(
         long_name = 'Number concentration per bin',
         units = '#/m3',
-        description = 'Deribed Number concentration per bin. Counts per sample volume. Derived from "CDP Particle Count" and "SV"',
+        description = 'Derived Number concentration per bin. Counts per sample volume. Derived from "CDP Particle Count" and "SV"',
         source = "CDP")
 
-    # Compute the total number concentration per time (sum of bin counts per sample volume) for bins larger than 6 mum
+    # Compute the total number concentration per time (sum of bin counts per sample volume) for bins larger than 6 mum (equal to bin 3)
     # divide by 1000000 to turn m3 to cm3
-    xds['Number Conc calc']=((xds['CDP Bin Particle Count'][:,6:].sum(dim='CDP_Bin'))/xds['SV_cdp'])/1e6
+    xds['Number Conc calc']=((xds['CDP Bin Particle Count'][:,3:].sum(dim='CDP_Bin'))/xds['SV_cdp'])/1e6
     xds['Number Conc calc'] = xds['Number Conc calc'].assign_attrs(
         long_name = 'Total Number concentration >6$\mu$ m',
         units = '#/cm3',
         description = 'Derived Total Number concentration for particles larger than 6 micrometer. Sum of counts for bins 7-30, per sample volume. Derived from "CDP Biin Particle Count" and "SV"',
         source = "CDP")
 
-    # calculate the LWC
+    # calculate the LWC per bin
     xds['LWC per bin calc'] = xds['Number Conc per bin']*xds['Mass']
     xds['LWC per bin calc'] = xds['LWC per bin calc'].assign_attrs(
         long_name = 'LWC per bin',
@@ -62,13 +62,13 @@ def create_derived_vars(xds):
         description = 'Derived Liquid Water Content calculated from mass and number concentration, per bin. Derived from "Mass Particle count" and "Number Conc per bin"',
         source = "CDP")
     
-    # calculate the LWC per time for bins higher than 6 mum
+    # calculate the total LWC per time 
     # multiply by 1000 to get g/m3
-    xds['LWC calc'] = 1000*xds['LWC per bin calc'][:,6:].sum(dim='CDP_Bin')
+    xds['LWC calc'] = 1000*xds['LWC per bin calc'].sum(dim='CDP_Bin')
     xds['LWC calc'] = xds['LWC calc'].assign_attrs(
         long_name = 'LWC',
         units = 'g/m3',
-        description= 'Derived Total Liquid Water Content for particles larger than 6 micrometers. Derived from "LWC per bin calc"',
+        description= 'Derived Total Liquid Water Content for particles larger than micrometers. Derived from "LWC per bin calc"',
         source = "CDP")
 
     return xds
