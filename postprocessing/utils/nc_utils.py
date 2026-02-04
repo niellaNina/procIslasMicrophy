@@ -542,3 +542,88 @@ def standardize_cip_netcdf(cip_nc_file, nav_tdyn_file,nav_nav_file, flight):
     nav_nav_xds.close()
     
     return cip_updated_xds
+
+# function for joining TODO: move to separate file (Preprocessing)
+def join_cdp_cip_ds(flight,sample_rate,level, cip_path, cdp_path):
+    """ Joins the CIP and CDP netCDFs on CIP time
+
+    Parameters
+    ----------
+    flight
+        A string representing the flightid (islasid) of the files
+    sample_rate
+        the sample rate (in sek) to use for joining
+    cip_path
+        The path to where the CIP-netCDFs are located
+    cdp_path
+        The path to where the CDP-netCDFs are located
+    save_path
+        The path to where the joint-netCDF will be stored
+
+    Returns
+    -------
+    microphy_ds
+        An xarray with updated attributes of the joined CIP and CDP netCDF.
+        Joined on sample time from the CIP netCDF file.
+    """
+
+    # Import packages
+    import xarray as xr
+    from datetime import date
+    import glob
+    import numpy as np
+
+    # Import local functions
+    from utils.func_nc import floor_to_sec_res
+
+
+    # read in data
+    cdp_file = glob.glob(cdp_path + f'CDP_updated_{flight}_{level}.nc')
+    cip_file = glob.glob(cip_path + f'CIP_update_{sample_rate}s_{flight}_{level}.nc')
+
+    print(f'Joining: {cdp_file[0]} and {cip_file[0]}')
+
+    cdp_ds = xr.open_dataset(cdp_file[0])
+    cip_ds = xr.open_dataset(cip_file[0])
+
+    #  Remove milliseconds to ease joining
+    cdp_ds = floor_to_sec_res(cdp_ds, 'time')
+    cip_ds = floor_to_sec_res(cip_ds, 'time')
+
+    # drop duplicate time steps 
+    index = np.unique(cdp_ds.time, return_index = True)[1]
+    cdp_ds = cdp_ds.isel(time=index)
+
+
+    # merge the two xarrays on the times from cip.
+    microphy_ds = xr.merge([cip_ds, cdp_ds],compat='override',join='left')
+    
+    # update attrs for variables with parent file
+    #for var_name in cdp_ds.data_vars:
+    #    microphy_ds[var_name].attrs.update({"parent file":cdp_file[0].split('/')[-1]})
+    #    microphy_ds[var_name].attrs.update({"instrument":"CDP"})
+    #for var_name in cip_ds.data_vars:
+    #    microphy_ds[var_name].attrs.update({"parent file":cip_file[0].split('/')[-1]})
+    #    microphy_ds[var_name].attrs.update({"instrument":"CIP"})
+    
+    # remove dataset attributes
+    #microphy_ds = microphy_ds.drop_attrs(deep = False)
+    
+    # set new dataset attributes
+    #microphy_ds.attrs['safireid']=cip_ds.attrs['safireid']
+    #microphy_ds.attrs['islasid']=cip_ds.attrs['islasid'] #NB! duplicated!
+    microphy_ds.attrs['parent files']=[cip_file[0].split('/')[-1],cdp_file[0].split('/')[-1]]
+    microphy_ds.attrs['date_modified'] = date.today().strftime("%Y-%m-%d")
+    microphy_ds.attrs['Joint sample rate (sek)'] = cip_ds.attrs['RATE'] # Todo make check to use the largest value (should always be CIP though)
+    
+
+    # set the islas id as a coordinate
+    #islasid = cip_ds.attrs['islasid']
+    #microphy_ds = microphy_ds.assign_coords({'islasid':islasid})
+
+    # close netcdf files
+    cip_ds.close
+    cdp_ds.close
+    print('...done')
+
+    return microphy_ds

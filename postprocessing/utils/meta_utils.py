@@ -120,3 +120,16 @@ def meta_from_data(xds):
                 }
 
     return meta_from_data_dict
+
+def set_attrs(ds, var, name,unit,description, par_var=[], par_file="", instrument=""):
+    # function to set standard attributes to new variables
+    ds[var].attrs['name'] = name
+    ds[var].attrs['unit'] = unit
+    ds[var].attrs['description'] = description
+
+    #optional arguments
+    if par_var != "": ds[var].attrs['parent variables'] = par_var
+    if par_file !="": ds[var].attrs['parent file'] = par_file
+    if instrument !="": ds[var].attrs['instrument'] = instrument
+
+    return ds
