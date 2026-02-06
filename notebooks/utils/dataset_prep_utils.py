@@ -65,6 +65,36 @@ def preselect(ds, rm_cirrus = True, rm_c_T = -35, marine = True, m_lat = 70, rm_
 
     return ds_relevant, pre_text
 
+
+def nc_save_with_check(savefile ,xds):
+    """Check if a netCDF file exists. Overwrite existing if user accepts, create new if not existing.
+
+    This function relies on the 'os' package for path management.
+
+    Parameters
+    ----------  
+        savefile: str
+            Path to netCDF file
+        xds: xarray.DataSet 
+            Dataset to write to savefile
+
+    """
+    import os
+
+    # Check if the file exists
+    if os.path.exists(savefile):
+        overwrite = input(f'The file {savefile} exists. Do you want to overwrite it?(y/n)')
+        if overwrite.lower() in ["yes", "y"]:
+            print(f'Saving to {savefile}')
+            xds.to_netcdf(path=savefile, mode='a')
+        else:
+            print("Exiting...")
+    else:
+        xds.to_netcdf(path=savefile, mode='w')
+        print(f'Saving to {savefile}')
+        
+    return
+
 def incloud_select(ds, th_method='LWC_IWC_th',lwc_th = 0.01, iwc_th = 0.01,n_ice_th = 0.1,n_drp_th = 2):
     """ Function to preselect the dataset to use in composite analysis
 

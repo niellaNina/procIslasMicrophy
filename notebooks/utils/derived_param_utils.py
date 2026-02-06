@@ -26,7 +26,7 @@ def calculate_slf(ds, iwc_param, lwc_param):
 
     ds['SLF'] = (ds[lwc_param]/ds['TWC'])*100 # calculate SLF in percent
     ds['SLF'].attrs['longname']='Supercooled Liquid Fraction'
-    ds['SLF'].attrs['unit']='Percent'
+    ds['SLF'].attrs['units']='Percent'
     ds['SLF'].attrs['description']='Liquid Water Content divided by Total Water Content'
     ds['SLF'].attrs['calculated from']=[lwc_param, 'TWC']
 
