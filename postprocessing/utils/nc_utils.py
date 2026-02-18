@@ -627,3 +627,66 @@ def join_cdp_cip_ds(flight,sample_rate,level, cip_path, cdp_path):
     print('...done')
 
     return microphy_ds
+
+
+#Old version
+def add_nav_to_joint(ds, nav_tdyn_file,nav_nav_file):
+    """ Add NAV parameters to the joint cdp/cip file
+
+    This function relies on the packages 'xarray','numpy' and 're' for datamanagement and calculations,
+    the date function from datetime for date management and the local function floor_to_sec_res from utils_func.nc.
+
+    Parameters
+    ----------
+    ds
+        ds with cip and cdp data
+    nav_file
+        Navigation file from flight
+    nav_tdyn_file
+        Navigational file with meteorological variables
+
+    Returns
+    -------
+    updated_xds
+        xarray dataset from the CIP file updated with coordinates and meteorological parameters from the nav file
+    """
+    import xarray as xr # read netcdf-files
+    import numpy as np
+    import re #regex
+    from datetime import date
+    from utils.func_nc import floor_to_sec_res
+    
+    nav_tdyn_xds = xr.open_dataset(nav_tdyn_file) # returns an xarray dataset
+    nav_nav_xds = xr.open_dataset(nav_nav_file) # the nav file containing pitch, roll etc
+
+    # drop duplicate time steps (in nav)
+    index = np.unique(nav_tdyn_xds.time, return_index = True)[1]
+    nav_tdyn_xds = nav_tdyn_xds.isel(time=index)
+    index = np.unique(nav_nav_xds.time, return_index = True)[1]
+    nav_nav_xds = nav_nav_xds.isel(time=index)
+    
+
+    # -- select times from the main ds
+    datetimes = ds.time.values                    #transform from seconds from midnight to datetimeobject     
+    
+    # select the NAV data from these times (for both nav files)
+    sel_data_tdyn = nav_tdyn_xds.sel(time=datetimes, method = "nearest")           # "nearest" due to diffs in decimalseconds
+    sel_data_nav = nav_nav_xds.sel(time=datetimes, method = "nearest")
+
+    # select the NAV data to add
+    test1 = nav_tdyn_xds[['TEMP1','PRES','WS','WD']]
+    test2 = nav_nav_xds[['ROLL','THEAD','PITCH']]
+
+    # calculate the gradient of the thead:
+    time = sel_data_nav.time
+    time_values = (time.dt.hour*3600+time.dt.minute*60+time.dt.second).values
+    dfdx_thead= np.gradient(ds['THEAD'], time_values, axis = 0)
+    ds['dfdx_thead'] = (('time',), dfdx_thead)
+    ds['dfdx_thead'].attrs['description']='Gradient of THEAD'
+    ds['dfdx_thead'].attrs['calculated from']=['THEAD','time']
+      
+
+    nav_tdyn_xds.close()
+    nav_nav_xds.close()
+    
+    return ds

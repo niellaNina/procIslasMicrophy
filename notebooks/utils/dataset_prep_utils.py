@@ -163,4 +163,42 @@ def incloud_select(ds, th_method='LWC_IWC_th',lwc_th = 0.01, iwc_th = 0.01,n_ice
     return ds_incloud, th_method, iwc_th 
 
 
+def sea_ice_from_sat(sic_path, sic_file_struct, dates):
+    """Get sea ice concentration from satellite data
+    This function relies on the xarray package
+    Parameters
+    ----------  
+        sic_path: str
+            Path to netCDF files
+        sic_file_struct: str 
+            Filename structure of file to get
+        dates: list
+            list of dates in 'YYYYMMDD' format to get sea ice information from
+    Returns
+    ----------
+        sics: list
+            list of xarrays with sea ice concentration, one per date in dates
 
+    """
+
+    import xarray as xr
+
+    sics = []
+    for date in dates:
+        # Get sea ice information from the given date
+        sic_ds = xr.open_dataset(sic_path  + date + sic_file_struct)
+
+        # rename data variable and update attributes
+        sic_ds['sic'] = sic_ds['__xarray_dataarray_variable__'].assign_attrs(units="Percent", description="Sea Ice Concentration")
+        sic_ds = sic_ds.drop_vars(['__xarray_dataarray_variable__'])
+
+        # add some attributes
+        sic_ds.attrs['date'] = date
+        sic_ds.attrs['file'] = f'asi-n6250-{date}-5.4_regridded.nc'
+
+        sics.append(sic_ds)
+
+        sic_ds.close() # close connection
+
+
+    return sics
