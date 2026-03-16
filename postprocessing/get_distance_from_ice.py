@@ -157,7 +157,8 @@ def main():
     sea_ice_threshold = 0.2 # threshold for sea ice concentration to consider as sea ice
     sea_ice_lon_lat = xr.open_dataset(f"/uio/kant/geo-geofag-u1/fslippe/data/land_sea_ice_mask/nimbus/with_lonlat/NSIDC0051_SEAICE_PS_N25km_20200302_v2.0.nc")
     merra_folder = "/mn/vann/fslippe/MERRA/" # path to MERRA-2 data
-    flight_folder = "/scratch/fslippe/CAO_flights/" # path to flight data
+    #flight_folder = "/scratch/fslippe/CAO_flights/" # path to flight data
+    flight_folder ='/home/ninalar/Documents/MC2/Results_2022-islas/Processed/ISLAS_processed/L2/'
     files = [f for f in os.listdir(flight_folder) if f.endswith(".nc")]
 
     for filename in files:

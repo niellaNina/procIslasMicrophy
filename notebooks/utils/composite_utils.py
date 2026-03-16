@@ -9,7 +9,7 @@ def add_alt_bins(ds, altitude_bins):
     # Label bins by midpoints
     bin_labels = (altitude_bins[:-1] + altitude_bins[1:]) / 2
     ds['altitude_bin'].data = bin_labels[alt_bin_indices - 1]
-    ds.coords['altitude_bin']=ds.coords['altitude_bin'].astype(int)
+    ds.coords['altitude_bin'] = ds.coords['altitude_bin'].astype(int)
     return ds
 
 def add_dist_bins(ds, dist_bins):
