@@ -208,10 +208,13 @@ def plot_flight_obs(ds, ds_incloud, sic_max_ds,sic_min_ds, obs,ax=None, lat_band
                     rotation=30)
     
     # add sea ice concentration
-    cs = ax.contour(sic_max_ds['lon'],sic_max_ds['lat'],sic_max_ds['sic'], transform=ccrs.PlateCarree(),levels=[25.], colors='tab:grey', linestyles='dashed')
-    contour_legend_max = mlines.Line2D([], [], color='tab:grey',linestyle='--', label='25% Sea Ice \n concentration')
-    cs_m = ax.contour(sic_max_ds['lon'],sic_min_ds['lat'],sic_min_ds['sic'], transform=ccrs.PlateCarree(),levels=[15.], colors='tab:grey', linestyles='dashdot')
-    contour_legend_min = mlines.Line2D([], [], color='tab:grey',linestyle='-.', label='25% Sea Ice \n concentration')
+    col1 = 'k'
+    col2 = 'tab:grey'
+    lw = 3
+    cs = ax.contour(sic_max_ds['lon'],sic_max_ds['lat'],sic_max_ds['sic'], transform=ccrs.PlateCarree(),levels=[25.], colors=col1, linestyles='dashed',linewidths=lw)
+    contour_legend_max = mlines.Line2D([], [], color=col1,linestyle='--', linewidth=lw,label='25% Sea Ice \n concentration')
+    cs_m = ax.contour(sic_max_ds['lon'],sic_min_ds['lat'],sic_min_ds['sic'], transform=ccrs.PlateCarree(),levels=[15.], colors=col2, linestyles='dotted',linewidths=lw)
+    contour_legend_min = mlines.Line2D([], [], color=col2,linestyle='dotted',linewidth=lw, label='25% Sea Ice \n concentration')
     
     #Plot Kiruna 
     ax.plot(lon_kir, lat_kir, marker='^',markersize=16, color='red', transform=data_projection)
@@ -232,12 +235,12 @@ def plot_flight_obs(ds, ds_incloud, sic_max_ds,sic_min_ds, obs,ax=None, lat_band
     handles.append(title_proxy)
     labels.append('Sea ice edge:')
     #append with sea ice information
-    handles.append(contour_legend_max)
-    max_date_obj = pd.to_datetime(sic_max_ds.attrs['date'], format='%Y%m%d')
-    labels.append(f"Max: {max_date_obj.strftime('%b')} {max_date_obj.strftime('%d')}")
     handles.append(contour_legend_min)
     min_date_obj = pd.to_datetime(sic_min_ds.attrs['date'], format='%Y%m%d')
     labels.append(f"Min: {min_date_obj.strftime('%b')} {min_date_obj.strftime('%d')}")
+    handles.append(contour_legend_max)
+    max_date_obj = pd.to_datetime(sic_max_ds.attrs['date'], format='%Y%m%d')
+    labels.append(f"Max: {max_date_obj.strftime('%b')} {max_date_obj.strftime('%d')}")
 
     plt.legend(handles=handles, labels=labels, loc='lower left', fontsize=16,)
     plt.tight_layout()
@@ -494,3 +497,23 @@ def plot_heatmap_ax(dist_df, labels_dict, ax, mask_na=False, val=0, annot_df = F
 
     
     return 
+
+def add_sect(ax,fs=13,y_val=0.95,x_vals=[0.08,0.3,0.8], xv_vals=[1,4], sect_name='c_type'):
+    # Function to add lines showing the different sections to the heatplots
+    # ax: axis to add the lines to
+    # fs: fontsize of the text
+    # y_val: height to add text at
+    # x_vals: array of x locations to put text
+
+    region_name = {'number': ['I','II','III'],
+                   'c_type': ['Shallow', 'Stratiform', 'Convective']}
+
+    # add section lines
+    ax.axvline(x=xv_vals[0], color='k', linestyle='-',linewidth=2, alpha = 0.5)
+    ax.axvline(x=xv_vals[1],color='k', linestyle='-',linewidth=2, alpha = 0.5)
+
+    # add text
+    ax.text(x_vals[0],y_val,region_name[sect_name][0], fontsize=fs, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+    ax.text(x_vals[1],y_val,region_name[sect_name][1], fontsize=fs, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+    ax.text(x_vals[2],y_val,region_name[sect_name][2], fontsize=fs, horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+    return

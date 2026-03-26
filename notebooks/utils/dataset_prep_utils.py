@@ -164,7 +164,7 @@ def incloud_select(ds, th_method='LWC_IWC_th',lwc_th = 0.01, iwc_th = 0.01,n_ice
 
 
 def sea_ice_from_sat(sic_path, sic_file_struct, dates):
-    """Get sea ice concentration from satellite data
+    """Get sea ice concentration from satellite dat
     This function relies on the xarray package
     Parameters
     ----------  
