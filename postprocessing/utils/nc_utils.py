@@ -322,7 +322,7 @@ def read_chunky_csv(textfile, sep=[]):
     return sublists
  
 
-def update_cip_nc(cip_nc_file, nav_nav_file, flight):
+def update_cip_nc(cip_nc_file, nav_nav_file,nav_tdyn_file, flight):
     """ Add coordinates(from nav) and metadata to CIP nc file
 
     This function relies on the packages 'xarray','numpy' and 're' for datamanagement and calculations,
@@ -351,6 +351,7 @@ def update_cip_nc(cip_nc_file, nav_nav_file, flight):
     
     cip_xds = xr.open_dataset(cip_nc_file) # the cip xarray (from soda)
     nav_nav_xds = xr.open_dataset(nav_nav_file) # the nav file xarray
+    nav_tdyn_xds = xr.open_dataset(nav_tdyn_file) # the nav file xarray
 
     # CIP preparations: fix time dimension cip_xds
     cip_xds = cip_xds.rename_vars({'elapsed_time':'time'}) # elapsed time holds the correct time to use, change name to time for simplicity
@@ -358,16 +359,64 @@ def update_cip_nc(cip_nc_file, nav_nav_file, flight):
     cip_xds = cip_xds.swap_dims({'Time': 'time'}) # set as main dimension
     cip_xds = floor_to_sec_res(cip_xds,'time') # floor the times to sec for easier joining
 
-    # NAV preparations: drop duplicate time steps (in nav)
-    index = np.unique(nav_nav_xds.time, return_index = True)[1]
-    nav_nav_xds = nav_nav_xds.isel(time=index)
-    nav_nav_xds = floor_to_sec_res(nav_nav_xds,'time') # floor the times to sec for easier joining
+    # NAV preparations: drop duplicate time steps (in nav and tdyn)
+    def drop_duplicate(xds):
+        index = np.unique(xds.time, return_index = True)[1]
+        xds = xds.isel(time=index)
+        xds = floor_to_sec_res(xds,'time') # floor the times to sec for easier joining
+        return xds
     
+    nav_tdyn_xds = drop_duplicate(nav_tdyn_xds)
+    nav_nav_xds = drop_duplicate(nav_nav_xds)
 
     # -- UPDATE COORDINATES based on NAV file
     datetimes = cip_xds.time.values                         
     sel_data_nav = nav_nav_xds.sel(time=datetimes, method = "nearest") # select the NAV data from times in CIP
     cip_updated_xds = cip_xds.assign_coords(sel_data_nav.coords)  # Add NAV coordinates to the CIP xarray
+
+    # add extra variables from the two nav files (and update attrs)
+    sel_data_tdyn = nav_tdyn_xds.sel(time=datetimes, method = "nearest")           # "nearest" due to diffs in decimalseconds
+    # add MET variables from Nav file: Temp, Pres, WS/WD, humidity parameters
+    cip_updated_xds['T'] = sel_data_tdyn['TEMP1']
+    cip_updated_xds['T'].attrs['origin file']=nav_tdyn_file
+
+    cip_updated_xds['P'] = sel_data_tdyn['PRES']
+    cip_updated_xds['P'].attrs['origin file']=nav_tdyn_file
+
+    cip_updated_xds['WS'] = sel_data_tdyn['WS']
+    cip_updated_xds['WS'].attrs['origin file']=nav_tdyn_file
+
+    cip_updated_xds['WD'] = sel_data_tdyn['WD']
+    cip_updated_xds['WD'].attrs['origin file']=nav_tdyn_file
+
+    cip_updated_xds['DP1'] = sel_data_tdyn['DP1']
+    cip_updated_xds['DP1'].attrs['origin file']=nav_tdyn_file
+
+    cip_updated_xds['HABS1'] = sel_data_tdyn['HABS1']
+    cip_updated_xds['HABS1'].attrs['origin file']=nav_tdyn_file
+
+    cip_updated_xds['RH1'] = sel_data_tdyn['RH1']
+    cip_updated_xds['RH1'].attrs['origin file']=nav_tdyn_file
+
+    cip_updated_xds['HABS1'] = sel_data_tdyn['HABS1']
+    cip_updated_xds['HABS1'].attrs['origin file']=nav_tdyn_file
+
+    cip_updated_xds['ROLL'] = sel_data_nav['ROLL']
+    cip_updated_xds['ROLL'].attrs['origin file']=nav_nav_file
+
+    cip_updated_xds['THEAD'] = sel_data_nav['THEAD']
+    cip_updated_xds['THEAD'].attrs['origin file']=nav_nav_file
+
+    cip_updated_xds['PITCH'] = sel_data_nav['PITCH']
+    cip_updated_xds['PITCH'].attrs['origin file']=nav_nav_file
+
+    # calculate the gradient of the thead:
+    time = sel_data_nav.time
+    time_values = (time.dt.hour*3600+time.dt.minute*60+time.dt.second).values
+    dfdx_thead= np.gradient(cip_updated_xds['THEAD'], time_values, axis = 0)
+    cip_updated_xds['dfdx_thead'] = (('time',), dfdx_thead)
+    cip_updated_xds['dfdx_thead'].attrs['description']='Gradient of THEAD'
+    cip_updated_xds['dfdx_thead'].attrs['calculated from']=['THEAD','time']
     
     # -- CIP variable updates and calculations
     
@@ -580,7 +629,8 @@ def join_cdp_cip_ds(flight,sample_rate,level, cip_path, cdp_path):
     # read in data
     cdp_file = glob.glob(cdp_path + f'CDP_updated_{flight}_{level}.nc')
     cip_file = glob.glob(cip_path + f'CIP_update_{sample_rate}s_{flight}_{level}.nc')
-
+    print(cdp_file)
+    print(cip_file)
     print(f'Joining: {cdp_file[0]} and {cip_file[0]}')
 
     cdp_ds = xr.open_dataset(cdp_file[0])
@@ -656,7 +706,9 @@ def add_nav_to_joint(ds, nav_tdyn_file,nav_nav_file):
     from datetime import date
     from utils.func_nc import floor_to_sec_res
     
+    print(nav_tdyn_file)
     nav_tdyn_xds = xr.open_dataset(nav_tdyn_file) # returns an xarray dataset
+    print(nav_nav_file)
     nav_nav_xds = xr.open_dataset(nav_nav_file) # the nav file containing pitch, roll etc
 
     # drop duplicate time steps (in nav)
@@ -674,7 +726,7 @@ def add_nav_to_joint(ds, nav_tdyn_file,nav_nav_file):
     sel_data_nav = nav_nav_xds.sel(time=datetimes, method = "nearest")
 
     # select the NAV data to add
-    test1 = nav_tdyn_xds[['TEMP1','PRES','WS','WD']]
+    ds = sel_data_tdyn[['TEMP1','PRES','WS','WD']]
     test2 = nav_nav_xds[['ROLL','THEAD','PITCH']]
 
     # calculate the gradient of the thead:
