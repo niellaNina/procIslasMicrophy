@@ -95,7 +95,7 @@ def nc_save_with_check(savefile ,xds):
         
     return
 
-def incloud_select(ds, th_method='LWC_IWC_th',lwc_th = 0.01, iwc_th = 0.01,n_ice_th = 0.1,n_drp_th = 2):
+def incloud_select(ds, lwc, iwc,  th_method='LWC_IWC_th',lwc_th = 0.01, iwc_th = 0.01,n_ice_th = 0.1,n_drp_th = 2):
     """ Function to preselect the dataset to use in composite analysis
 
     This function relies on the "pandas" package
@@ -104,6 +104,8 @@ def incloud_select(ds, th_method='LWC_IWC_th',lwc_th = 0.01, iwc_th = 0.01,n_ice
     ---------- 
         ds: Xarray.DataSet
             xarray dataset 
+        lwc: namev of LWC parameter to use
+        iwc: name of IWC parameter to use
         th_method: str, Default 'LWC_IWC_th'
             Method used to decide in-cloud values. 
             Options:
@@ -141,7 +143,7 @@ def incloud_select(ds, th_method='LWC_IWC_th',lwc_th = 0.01, iwc_th = 0.01,n_ice
     # th_method is used to selecting the selection criteria and is added to saved plots for organizing
     if th_method == 'LWC_th':
         # only lwc have to be larger than threshold, use lwc mask
-        incloud_mask = ((ds['LWC calc']>= lwc_th)).compute() # mask the values based on twc
+        incloud_mask = ((ds[lwc]>= lwc_th)).compute() # mask the values based on twc
         #th = f'{lwc_th} m^-3, (LWC)'
     elif th_method == 'TWC_th':
         # twc have to be larger than threshold value, use twc mask
@@ -149,7 +151,7 @@ def incloud_select(ds, th_method='LWC_IWC_th',lwc_th = 0.01, iwc_th = 0.01,n_ice
         #th = f'{lwc_th} m^-3, (TWC)'
     elif th_method == 'LWC_IWC_th':
         # either lwc or iwc needs to be larger than the threshold, use lwc_iwc_mask
-        incloud_mask = ((ds['LWC calc']>= lwc_th)|(ds['IWC100']>= iwc_th)).compute() # mask the values based on lwc or iwc according to threshold
+        incloud_mask = ((ds[lwc]>= lwc_th)|(ds[iwc]>= iwc_th)).compute() # mask the values based on lwc or iwc according to threshold
         #th = f'{lwc_th} m^-3, (LWC or IWC)'
     elif th_method == 'N_th':
         incloud_mask = ((ds['Number Conc calc']>= n_drp_th)|(ds['NT100']>= n_ice_th)).compute() # using calc instead of corr
