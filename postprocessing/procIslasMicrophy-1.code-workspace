@@ -12,6 +12,10 @@
 		{
 			"name": "Add_metadataACDD",
 			"path": "../../ACDD/Add_metadataACDD"
+		},
+		{
+			"name": "wrf-islas2022microphy-validation",
+			"path": "../../wrf-islas2022microphy-validation/wrf-islas2022microphy-validation"
 		}
 	],
 	"settings": {}

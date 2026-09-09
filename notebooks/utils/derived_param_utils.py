@@ -1,116 +1,57 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Fri May  23 13:30:26 2025
-Scripts related to handling netcdfs in the islas processing
-
-@author: ninalar
-"""
-
-def floor_to_sec_res(ds, time_dim):
-    """ Function to floor the time to whole seconds
-
-    This function relies on the "pandas" package
+def calculate_slf(ds, iwc_param, lwc_param):
+    """Calculate Supercooled liquid fraction(SLF) from given IWC and LWC parameters
 
     Parameters
-    ---------- 
-        ds: Xarray.DataSet
-            xarray dataset with time dimention variable defined by "time_dim"
-        time_dim: str
-            name of xarray variable containing time dimention in seconds.
-    
-    Returns
     ----------
-        ds: Xarray.DataSet
-            the original ds with the time_dim floored to closest whole seconds
+    ds
+        xarray dataset that includes at least one IWC parameter and at least one LWC parameter
+    iwc_param
+        Name of IWC parameter to use for calculation of SLF
+    lwc_param
+        Name of LWC parameter to use for calculation of SLF
+
+    Returns
+    -------
+    ds
+        Updated xarray dataset that includes TWC and SLF calculated from the given IWC and LWC parameters
     """
-    
-    import pandas as pd
+    import xarray as xr
+    import numpy as np
 
-    # Convert to pandas datetime index
-    datetime_index = pd.to_datetime(ds[time_dim].values) # turn into datetime index
-    floored_time = datetime_index.floor('s') # floor on seconds
-
-    return ds.assign_coords({time_dim: floored_time})
-
-def sec_since_midnigth(dt_obj):
-    # calculating the seconds since midnight from a given datetime object
-    # requires: import datetime
-    # input: datetime object
-    # returns: seconds since midnight
-    from datetime import datetime
-    
-    if isinstance(dt_obj, datetime):
-        midnight = dt_obj.replace(hour=0, minute=0, second=0, microsecond=0)
-        seconds = (dt_obj - midnight).total_seconds()
-        return(seconds)
+    if ds[iwc_param].attrs['parameterization']=='Heymsfield2010_general':
+        suffix='H10'
+    elif ds[iwc_param].attrs['parameterization']=='Brown and Francis 1995':
+        suffix = 'BF95'
     else:
-        raise Exception(f'Error: The value "{dt_obj}" passed to sec_since_midnigth was not a datetime')
-
-
-def resolve_date(year, day_num):
-    """Resolving date from day number (day_num) and year 
-
-    This function relies on the 'datetime' and 'dateutil' packages
-
-    Parameters
-    ----------
-    day_num: int
-        number of days since 01.01
-    year: int
-        Year in YYYY format
-
-    Returns
-    ----------
-    res:
-        resulting date in format YYYY-MM-DD
-    """
-  
-    from datetime import timedelta
-    from dateutil import parser
- 
-    # creating date string
-    date_str = year.astype('int').astype('str') + "-01-01"  # January 1st of the given year
-    date_obj = date_str.apply(parser.parse)  # parse date string to datetime object
+        print('Parametrization not defined')
+        return
     
-    # creating the days in proper format from series'
-    day_obj = day_num.apply(lambda x: timedelta(days=int(x)-1))
- 
-    # adding days to datetime object
-    res = date_obj + day_obj
- 
-    return res
-
-def find_unique_listkey(dict, sub_key):
-    """Count number of unique keys in a dictionary 
-
-    Parameters
-    ----------
-    dict: dict
-        dictionary containing keys
-    sub_key: str
-        
-
-    Returns
-    ----------
-    set(values): set
-        the unique values found
-    """
-    values = []
+    twc_name = f'TWC_{suffix}'
+    slf_name = f'SLF_{suffix}'
     
-    for key in dict:
-        if sub_key in dict[key].keys():
-          values.append(dict[key][sub_key][0])
-    
-    # Return all unique values
-    return set(values)
+    ds[twc_name] = (ds[iwc_param]+ds[lwc_param]).where(ds['incloud_flag'], np.nan) # first calculate TWC
+    # update TWC attributes
+    ds[twc_name].attrs['longname']='Total Water Content'
+    ds[twc_name].attrs['unit']='g/m^3'
+    ds[twc_name].attrs['description']='Sum of Liquid and Ice Water Content'
+    ds[twc_name].attrs['calculated from']=[iwc_param,lwc_param]
+    ds[twc_name].attrs['Ice mass parameterization'] = ds[iwc_param].attrs['parameterization']
 
+    ds[slf_name] = ((ds[lwc_param]/ds[twc_name])*100).where(ds['incloud_flag'], np.nan) # calculate SLF in percent
+    ds[slf_name].attrs['longname']='Supercooled Liquid Fraction'
+    ds[slf_name].attrs['units']='Percent'
+    ds[slf_name].attrs['description']='Liquid Water Content divided by Total Water Content'
+    ds[slf_name].attrs['calculated from']=[lwc_param, twc_name]
+    ds[slf_name].attrs['Ice mass parameterization'] = ds[iwc_param].attrs['parameterization']
+
+    
+    return ds
 
 def mass_param(param, xds, name_add=""):
     # Function to calculate the mass and IWC based on the given mass-parametrization scheme
     # Input: 
     # --- param: str
-    #       parametrization scheme to use, available options: Heymsfield2010, Brown&Francis
+    #       parametrization scheme to use, available options: Heymsfield2010, Brown&Francis, Heymsfield2010_general, CRYSTAL
     # --- xds: xarray DataSet
     #        xarray containing the original CIP bins, sizes and concentrations. The sizing method used when preprocessing the 2Dprobe data will affect
     #        the results from this function. 
@@ -152,17 +93,25 @@ def mass_param(param, xds, name_add=""):
     xds[mvar_name] = a*(xds['MIDBINS']/1.0e4)**b # in m from um, MIDBINS are 25,50,75, ...,1600
     # update metadata for variable
     xds[mvar_name] = xds[mvar_name].assign_attrs({'long_name':f'Mass from {param}',
-                                                        'source':'CIP',
-                                                        'units':'g'})#,
-                                                        #'description': massdim_param[param]['description']})
+                                                    'source':'CIP',
+                                                    'units':'g',
+                                                    'parameterization': param,
+                                                    'parameterization info': massdim_param[param]})
 
     # IWC calculation
     var_name = 'IWC' + name_add # adjust parameter name to account for multiple parametrizations in one dataset
-    binwidth = xds['MIDBINS'][1].values - xds['MIDBINS'][0].values
+    binwidth = xds['MIDBINS'][0].values[1] - xds['MIDBINS'][0].values[0]
     spec = xds['CONCENTRATION']*(binwidth/1.0e6) # unnormalize the concentration
     lwc_per_bin = spec*xds[mvar_name] 
     xds[var_name] = lwc_per_bin.sum(dim='Vector64')
+
+    # update metadata for variable
+    xds[var_name] = xds[var_name].assign_attrs({'long_name':f'Ice Water Content from {param}',
+                                                    'instrument':'CIP',
+                                                    'units':'gram/m3',
+                                                    'parameterization': param,
+                                                    'parameterization info': massdim_param[param] })
     
     
-    return xds, massdim_param
+    return xds
 
